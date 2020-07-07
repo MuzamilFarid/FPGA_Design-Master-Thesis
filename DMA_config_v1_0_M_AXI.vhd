@@ -22,7 +22,8 @@ entity DMA_config_v1_0_M_AXI is
 		C_M_AXI_DATA_WIDTH	: integer	:= 32;
 		-- Transaction number is the number of write 
     -- and read transactions the master will perform as a part of this example memory test.
-		C_M_TRANSACTIONS_NUM	: integer	:= 4
+		C_M_TRANSACTIONS_NUM	: integer	:= 4;
+		Desired_DMA_Transfers : integer := 5
 	);
 	port (
 		-- Users to add ports here
@@ -31,7 +32,7 @@ entity DMA_config_v1_0_M_AXI is
 		-- Do not modify the ports beyond this line
 
 		-- Initiate AXI transactions
-		INIT_AXI_TXN	: in std_logic;
+		--INIT_AXI_TXN	: in std_logic;
 		-- Asserts when ERROR is detected
 		ERROR	: out std_logic;
 		-- Asserts when AXI transactions is complete
@@ -201,7 +202,8 @@ architecture implementation of DMA_config_v1_0_M_AXI is
   component fsm_dma is
   
   generic (
-  Base_DMA_Addr : std_logic_vector := x"41E00000"
+  Base_DMA_Addr : std_logic_vector := x"41E00000";
+  Desired_DMA_Transfers : integer := 5
   );
   
 
@@ -214,6 +216,7 @@ architecture implementation of DMA_config_v1_0_M_AXI is
   valid_r  : in std_logic;
   ready_r  : in std_logic;
   Bvalid : in std_logic;
+  Rvalid : in std_logic;
 
  
   
@@ -259,19 +262,19 @@ begin
 
 
 	--Generate a pulse to initiate AXI transaction.
-	process(M_AXI_ACLK)                                                          
-	begin                                                                             
-	  if (rising_edge (M_AXI_ACLK)) then                                              
-	      -- Initiates AXI transaction delay        
-	    if (M_AXI_ARESETN = '0' ) then                                                
-	      init_txn_ff <= '0';                                                   
-	        init_txn_ff2 <= '0';                                                          
-	    else                                                                                       
-	      init_txn_ff <= INIT_AXI_TXN;
-	        init_txn_ff2 <= init_txn_ff;                                                                     
-	    end if;                                                                       
-	  end if;                                                                         
-	end process; 
+--	process(M_AXI_ACLK)                                                          
+--	begin                                                                             
+--	  if (rising_edge (M_AXI_ACLK)) then                                              
+--	      -- Initiates AXI transaction delay        
+--	    if (M_AXI_ARESETN = '0' ) then                                                
+--	      init_txn_ff <= '0';                                                   
+--	        init_txn_ff2 <= '0';                                                          
+--	    else                                                                                       
+--	      init_txn_ff <= INIT_AXI_TXN;
+--	        init_txn_ff2 <= init_txn_ff;                                                                     
+--	    end if;                                                                       
+--	  end if;                                                                         
+--	end process; 
 
 
 	----------------------
@@ -303,7 +306,7 @@ begin
 	    if (rising_edge (M_AXI_ACLK)) then                                              
 	      --Only VALID signals must be deasserted during reset per AXI spec             
 	      --Consider inverting then registering active-low reset for higher fmax        
-	      if (M_AXI_ARESETN = '0' or init_txn_pulse = '1') then                                                
+	      if (M_AXI_ARESETN = '0' or start_trans = '1') then                                                
 	        axi_awvalid <= '0';                                                         
 	      else                                                                          
 	        --Signal a new address/data command is available by user logic              
@@ -324,7 +327,7 @@ begin
 	  process(M_AXI_ACLK)                                                               
 	  begin                                                                             
 	    if (rising_edge (M_AXI_ACLK)) then                                              
-	      if (M_AXI_ARESETN = '0' or init_txn_pulse = '1') then                                                
+	      if (M_AXI_ARESETN = '0' or start_trans = '1') then                                                
 	        write_index <= (others => '0');                                             
 	      elsif (start_writing = '1') then                                         
 	        -- Signals a new write address/ write data is                               
@@ -346,7 +349,7 @@ begin
 	   process(M_AXI_ACLK)                                                 
 	   begin                                                                         
 	     if (rising_edge (M_AXI_ACLK)) then                                          
-	       if (M_AXI_ARESETN = '0' or init_txn_pulse = '1' ) then                                            
+	       if (M_AXI_ARESETN = '0' or start_trans = '1' ) then                                            
 	         axi_wvalid <= '0';                                                      
 	       else                                                                      
 	         if (start_writing = '1') then                                      
@@ -379,7 +382,7 @@ begin
 	  process(M_AXI_ACLK)                                            
 	  begin                                                                
 	    if (rising_edge (M_AXI_ACLK)) then                                 
-	      if (M_AXI_ARESETN = '0' or init_txn_pulse = '1') then                                   
+	      if (M_AXI_ARESETN = '0' or start_trans = '1') then                                   
 	        axi_bready <= '0';                                             
 	      else                                                             
 	        if (M_AXI_BVALID = '1' and axi_bready = '0') then              
@@ -425,7 +428,7 @@ begin
 	  process(M_AXI_ACLK)                                                              
 	  begin                                                                            
 	    if (rising_edge (M_AXI_ACLK)) then                                             
-	      if (M_AXI_ARESETN = '0' or init_txn_pulse = '1') then                                               
+	      if (M_AXI_ARESETN = '0' or start_trans = '1') then                                               
 	        axi_arvalid <= '0';                                                        
 	      else                                                                         
 	        if (start_reading = '1') then                                          
@@ -742,7 +745,8 @@ begin
 
     inst : fsm_dma
     generic map (
-     Base_DMA_Addr => C_M_TARGET_SLAVE_BASE_ADDR
+     Base_DMA_Addr => C_M_TARGET_SLAVE_BASE_ADDR,
+     Desired_DMA_Transfers => Desired_DMA_Transfers
      )
      port map(
      clk => M_AXI_ACLK,
@@ -757,8 +761,9 @@ begin
      Bvalid => M_AXI_BVALID,
      valid_r  => axi_arvalid,
      ready_r   => M_AXI_ARREADY,
-     addrR => M_AXI_ARADDR,
-     dataR => M_AXI_RDATA
+     addrR => axi_araddr,
+     dataR => M_AXI_RDATA,
+     Rvalid => M_AXI_RVALID
       );
 
 
