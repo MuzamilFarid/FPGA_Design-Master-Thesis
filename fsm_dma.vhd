@@ -34,7 +34,8 @@ use IEEE.NUMERIC_STD.ALL;
 entity fsm_dma is
  
  generic (
-    Base_DMA_addr : std_logic_vector := x"41e00000"
+    Base_DMA_addr : std_logic_vector := x"41e00000";
+    Desired_DMA_Transfers : integer := 5
     
     );
  
@@ -422,7 +423,7 @@ begin
                countrec <= countrec + 1;
                rsignal <= '1';
         
-             if(countrec = 4) then
+             if(countrec = Desired_DMA_Transfers-1) then
                stopcore <= '1';
                countrec <= 0;
              

@@ -15,7 +15,8 @@ entity DMA_config_v1_0 is
 		C_M_AXI_TARGET_SLAVE_BASE_ADDR	: std_logic_vector	:= x"41E00000";
 		C_M_AXI_ADDR_WIDTH	: integer	:= 32;
 		C_M_AXI_DATA_WIDTH	: integer	:= 32;
-		C_M_AXI_TRANSACTIONS_NUM	: integer	:= 4
+		C_M_AXI_TRANSACTIONS_NUM	: integer	:= 4;
+		Desired_DMA_Transfers : integer := 5
 	);
 	port (
 		-- Users to add ports here
@@ -25,7 +26,7 @@ entity DMA_config_v1_0 is
 
 
 		-- Ports of Axi Master Bus Interface M_AXI
-		m_axi_init_axi_txn	: in std_logic;
+		--m_axi_init_axi_txn	: in std_logic;
 		m_axi_error	: out std_logic;
 		m_axi_txn_done	: out std_logic;
 		m_axi_aclk	: in std_logic;
@@ -62,10 +63,11 @@ architecture arch_imp of DMA_config_v1_0 is
 		C_M_TARGET_SLAVE_BASE_ADDR	: std_logic_vector	:= x"41E00000";
 		C_M_AXI_ADDR_WIDTH	: integer	:= 32;
 		C_M_AXI_DATA_WIDTH	: integer	:= 32;
-		C_M_TRANSACTIONS_NUM	: integer	:= 4
+		C_M_TRANSACTIONS_NUM	: integer	:= 4;
+		Desired_DMA_Transfers : integer := 5
 		);
 		port (
-		INIT_AXI_TXN	: in std_logic;
+		--INIT_AXI_TXN	: in std_logic;
 		ERROR	: out std_logic;
 		TXN_DONE	: out std_logic;
 		M_AXI_ACLK	: in std_logic;
@@ -102,10 +104,11 @@ DMA_config_v1_0_M_AXI_inst : DMA_config_v1_0_M_AXI
 		C_M_TARGET_SLAVE_BASE_ADDR	=> C_M_AXI_TARGET_SLAVE_BASE_ADDR,
 		C_M_AXI_ADDR_WIDTH	=> C_M_AXI_ADDR_WIDTH,
 		C_M_AXI_DATA_WIDTH	=> C_M_AXI_DATA_WIDTH,
-		C_M_TRANSACTIONS_NUM	=> C_M_AXI_TRANSACTIONS_NUM
+		C_M_TRANSACTIONS_NUM	=> C_M_AXI_TRANSACTIONS_NUM,
+		Desired_DMA_Transfers => Desired_DMA_Transfers
 	)
 	port map (
-		INIT_AXI_TXN	=> m_axi_init_axi_txn,
+		--INIT_AXI_TXN	=> m_axi_init_axi_txn,
 		ERROR	=> m_axi_error,
 		TXN_DONE	=> m_axi_txn_done,
 		M_AXI_ACLK	=> m_axi_aclk,
