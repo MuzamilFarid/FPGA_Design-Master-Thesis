@@ -67,7 +67,7 @@ end fsm_dma;
 
 architecture Behavioral of fsm_dma is
 
-type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, dma_stop, restart, dram_sa, mm2s_length, stop_dma);
+type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, dma_stop, mm2s_start, dram_sa, mm2s_length, stop_dma, mm2s_read,mm2s_status,mm2s_stop);
 
 signal dma_state : state_m;
 
@@ -79,14 +79,19 @@ signal asignal  : std_logic := '0';
 signal Next_Dram_Addr : integer := 0;
 signal scntr   : integer := 0;
 signal dram_alert : std_logic := '0';
-signal   cntrlstart : std_logic;
-signal   cntrlread : std_logic;
+signal cntrlstart : std_logic;
+signal cntrlread : std_logic;
 signal start_writing : std_logic;
 signal recon       : std_logic := '0';
 signal stopcore   : std_logic := '0';
 signal countrec  : integer := 0;
-signal start_reading : std_logic;
+signal start_reading : std_logic := '0';
 signal rsignal    : std_logic := '0';
+signal MM2S_DMEM  : std_logic_vector(31 downto 0) := (others => '0');
+signal Next_MM2S_Addr : integer := 0;
+signal loop_signal    : std_logic := '0';
+
+
 
 
 
@@ -101,6 +106,7 @@ constant dma_mm2s_cntrl_reg_addr : integer := 0;
 constant dma_mm2s_dram_reg_addr : integer := 24;
 constant dma_mm2s_lngth_reg_addr : integer := 40;
 constant dma_status_reg_addr : integer := 52;
+constant dma_mm2s_status_reg_addr : integer := 4;
 
 
 begin
@@ -258,11 +264,131 @@ begin
              addrw <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_init_reg_addr, 32));
              dataw <= "00000000000000000000000000000000";
                if(valid_w = '1' and ready_w = '1') then
-                             dma_state <= stop_dma;
+                             dma_state <= mm2s_start;
                              else
                              dma_state <= stop_dma;
                              
                           end if;
+        
+        when mm2s_start => 
+        
+               cntrlstart <= '1';
+               cntrlread <= '0';
+               
+               addrw <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_mm2s_cntrl_reg_addr, 32));
+                dataw <= "00000000000000000000000000000001";
+                drcntr <= '1';
+                if(valid_w = '1' and ready_w = '1') then
+                      dma_state <= dram_sa;
+                else
+                       dma_state <= mm2s_start;
+                 end if;
+          
+         when  dram_sa =>
+         
+                 cntrlstart <= '1';
+                 cntrlread <= '0';
+                 addrw <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_mm2s_dram_reg_addr, 32));
+                
+                  if(valid_w = '1' and ready_w = '1') then
+                      dma_state <= mm2s_length;
+                  else
+                      dma_state <= dram_sa;
+                  end if;
+                
+               
+                 if(drcntr = '1') then
+                     dataw <= MM2S_DMEM;
+                     drcntr <= '0';
+                  end if;
+                  
+                      if(dram_alert = '1') then
+                      
+                    if(scntr = 1) then
+                      scntr <= 0;
+                        dram_alert <= '0';
+                        dataw <= MM2S_DMEM;
+                        
+                      elsif(dsignal = 1) then
+                           dsignal <= 0;
+                          asignal <= '1';
+                         else 
+                        Next_MM2S_Addr <= 255*4;
+                         dsignal <= dsignal + 1;
+                        
+                       if(asignal = '1') then
+                         MM2S_DMEM <= std_logic_vector(to_unsigned(Next_MM2S_Addr , 32) + unsigned(MM2S_DMEM));
+                         asignal <= '0';
+                        dsignal <= 0;
+                        scntr <= scntr + 1 ; 
+             
+                        end if;
+                        
+                       end if;
+                      end if; 
+                  
+                     
+            when mm2s_length =>
+            
+                        cntrlstart <= '1';
+                         cntrlread <= '0';
+                         addrw <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_mm2s_lngth_reg_addr, 32));
+                        dataw <= "00000000000000000000010000000000";
+                        
+                          if(valid_w = '1' and ready_w = '1') then
+                              dma_state <= mm2s_read;
+                          else
+                              dma_state <= mm2s_length;
+                          end if;
+                             
+             when mm2s_read =>
+             
+                  cntrlstart <= '0';
+                    cntrlread <= '1';
+                   
+                     if(valid_r = '1' and ready_r = '1') then
+                      addrR <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_mm2s_cntrl_reg_addr, 32));
+                         dma_state <= mm2s_status;
+                     else
+                         dma_state <= mm2s_read;
+                     end if;        
+                                       
+             when mm2s_status =>
+             cntrlstart <= '0';
+              cntrlread <= '1';
+             
+                  if(valid_r = '1' and ready_r = '1') then
+                   
+                          addrR <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_mm2s_status_reg_addr, 32)); 
+                            dma_state <= mm2s_read;
+                            
+                    else
+                    dma_state <= mm2s_status;
+                    
+                    if(stopcore = '1' and recon = '1') then
+                           
+                      dma_state <= mm2s_stop;
+                      loop_signal <= '1';
+                            
+                        elsif(rsignal= '1') then
+                             dma_state <= dram_sa;
+                             dram_alert <= '1';
+                                       
+                            else
+                           dma_state <= mm2s_status;
+                                  end if;    
+                          end if;
+
+            when mm2s_stop =>
+             cntrlstart <= '1';
+           cntrlread <= '0';
+            addrw <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_mm2s_cntrl_reg_addr, 32));
+           dataw <= (others => '0');
+                         
+           if(valid_w = '1' and ready_w = '1') then  
+             dma_state <= mm2s_stop;
+             end if;
+               
             
                
                when others =>
