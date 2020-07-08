@@ -61,7 +61,8 @@ entity fsm_dma is
  dataw  : out std_logic_vector(31 downto 0);
  addrR : out std_logic_vector(31 downto 0);
  dataR  : in std_logic_vector(31 downto 0);
- Rvalid : in std_logic
+ Rvalid : in std_logic;
+ s2mm_wdata : in std_logic_vector(31 downto 0)
  
   );
 end fsm_dma;
@@ -80,8 +81,8 @@ signal asignal  : std_logic := '0';
 signal Next_Dram_Addr : integer := 0;
 signal scntr   : integer := 0;
 signal dram_alert : std_logic := '0';
-signal cntrlstart : std_logic;
-signal cntrlread : std_logic;
+signal cntrlstart : std_logic := '0';
+signal cntrlread : std_logic := '0';
 signal start_writing : std_logic;
 signal recon       : std_logic := '0';
 signal stopcore   : std_logic := '0';
@@ -91,12 +92,7 @@ signal rsignal    : std_logic := '0';
 signal MM2S_DMEM  : std_logic_vector(31 downto 0) := (others => '0');
 signal Next_MM2S_Addr : integer := 0;
 signal loop_signal    : std_logic := '0';
-
-
-
-
-
-
+signal s2mm_valid : std_logic := '0';
 
 
 
@@ -109,8 +105,30 @@ constant dma_mm2s_lngth_reg_addr : integer := 40;
 constant dma_status_reg_addr : integer := 52;
 constant dma_mm2s_status_reg_addr : integer := 4;
 
+ component throughput_dma is
+   port (
+   clk : in std_logic;
+   rst : in std_logic;
+   s2mm_wdata : in std_logic_vector(31 downto 0);
+   s2mm_valid : in std_logic
+   );
+   end component;
+   
+
 
 begin
+
+
+
+  throughput : throughput_dma
+   port map (
+      clk => clk,
+      rst  => rst,
+      s2mm_wdata => s2mm_wdata,
+     s2mm_valid => s2mm_valid
+      );
+
+
 
 process(clk)
 
@@ -142,7 +160,9 @@ begin
       addrw <= std_logic_vector(unsigned(Base_DMA_Addr) + to_unsigned(dma_init_reg_addr, 32));
       dataw <= "00000000000000000000000000000001";
         drcntr <= '1';
+     
       if(valid_w = '1' and ready_w = '1') then
+           s2mm_valid <= '1';
            dma_state <= dram_addr;
            else
            dma_state <= dma_s;
@@ -175,7 +195,7 @@ begin
             dsignal <= dsignal + 1;
            
           if(asignal = '1') then
-            DMEM_Addr <= std_logic_vector(to_unsigned(Next_Dram_Addr , 32) + unsigned(DMEM_Addr));
+            DMEM_Addr <= std_logic_vector(to_unsigned((Next_Dram_Addr +4) , 32) + unsigned(DMEM_Addr));
             asignal <= '0';
            dsignal <= 0;
            scntr <= scntr + 1 ; 
@@ -318,7 +338,7 @@ begin
                          dsignal <= dsignal + 1;
                         
                        if(asignal = '1') then
-                         MM2S_DMEM <= std_logic_vector(to_unsigned(Next_MM2S_Addr , 32) + unsigned(MM2S_DMEM));
+                         MM2S_DMEM <= std_logic_vector(to_unsigned((Next_MM2S_Addr +4) , 32) + unsigned(MM2S_DMEM));
                          asignal <= '0';
                         dsignal <= 0;
                         scntr <= scntr + 1 ; 
@@ -482,7 +502,7 @@ begin
 
    start_read <=  start_reading;
 
-
+   
 
 
 
