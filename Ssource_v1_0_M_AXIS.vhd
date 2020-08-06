@@ -50,14 +50,18 @@ end Ssource_v1_0_M_AXIS;
 	
 	signal stream_data       : integer := 0;
 	signal AXIS_data  : std_logic_vector(31 downto 0);
-	signal Tvalid_signal      : std_logic := '0';
-	signal Tlast_signal        : std_logic := '0';
-	signal counter              : integer := 1;
-	signal ct   : integer := 0;
+	signal Tvalid      : std_logic := '0';
+	signal Tlast        : std_logic := '0';
+	signal counter              : integer := 0;
+	signal ctr   : integer := 0;
 	signal frame_1   : std_logic := '0';
 	signal frame_2    : std_logic := '0';
-	signal frame_number : unsigned( 7 downto 0);
+	signal frame_number : integer := 0;
 	signal offset_value  : integer := 0;
+	signal countreg : integer := -1;
+	signal base_value : integer := 0;
+	signal first_frame_size : integer := 254;
+	signal start_frame : std_logic := '0';
 	
 	
 
@@ -70,32 +74,35 @@ begin
     --  Design for the M_AXIS_TData where data is datat 32 bits and is incremented whenevr tready and tvalid are high
       
      process(M_AXIS_ACLK)
-
+   
      begin
      
      
      if rising_edge(M_AXIS_ACLK) then
           if (M_AXIS_ARESETN = '0') then
            stream_data  <= 0;
-          
+            frame_number <= 0;
+           
            
        
     else
     
-
+    
+    
          
-         if(frame_number = "00000000") then
-          if(Tvalid_signal = '1' and M_AXIS_TREADY ='1') then
+         if(frame_number = 0) then
+             
+              if(Tvalid = '1' and M_AXIS_TREADY ='1') then
            
-            stream_data <= stream_data + 1;
-            counter <= counter + 1;
+                 stream_data <= stream_data + 1;
+                 counter <= counter + 1;
               
             
-                if(stream_data = 254) then
-                        Tlast_signal <= '1';
-                        
-                 else
-                    Tlast_signal <= '0';       
+                  if(stream_data = first_frame_size) then
+                        Tlast <= '1';
+              
+                    else
+                       Tlast <= '0';       
             
              end if;
              
@@ -103,16 +110,19 @@ begin
                          
          end if;
        
-       if(frame_number = "00000001") then
-            
-          if(Tvalid_signal = '1' and M_AXIS_TREADY ='1') then
+       if(frame_number = 1) then
+       
+           
+          if(Tvalid = '1' and M_AXIS_TREADY ='1') then
             stream_data <= stream_data + 1;
+            counter <= counter + 1;
+          
                
-               if(stream_data = stream_data + offset_value) then
-                    Tlast_signal <= '1';
+               if(stream_data = offset_value) then
+                    Tlast <= '1';
 
                    else
-                   Tlast_signal <= '0';
+                   Tlast <= '0';
               
                   end if;
                   end if;
@@ -120,15 +130,16 @@ begin
      end if;
      
            
-     if(frame_number = "00000010") then
-        if(Tvalid_signal = '1' and M_AXIS_TREADY ='1') then
+     if(frame_number = 2) then
+        if(Tvalid = '1' and M_AXIS_TREADY ='1') then
           stream_data <= stream_data + 1;
+          counter <= counter + 1;
              
-             if(stream_data = stream_data + offset_value) then
-                  Tlast_signal <= '1';
+             if(stream_data = offset_value) then
+                  Tlast <= '1';
 
                  else
-                 Tlast_signal <= '0';
+                 Tlast <= '0';
             
                 end if;
                 end if;
@@ -136,83 +147,104 @@ begin
    end if; 
      
             
---   if(frame_number = "00000011") then
---      if(Tvalid_signal = '1' and M_AXIS_TREADY ='1') then
---        stream_data <= stream_data + 1;
---           
---           if(stream_data = stream_data + offset_value) then
---                Tlast_signal <= '1';
---
---               else
---               Tlast_signal <= '0';
---          
---              end if;
---              end if;
---
--- end if;
+   if(frame_number = 3) then
+      if(Tvalid = '1' and M_AXIS_TREADY ='1') then
+        stream_data <= stream_data + 1;
+         counter <= counter + 1;
+           
+           if(stream_data = offset_value) then
+                Tlast <= '1';
+
+               else
+               Tlast <= '0';
+          
+              end if;
+              end if;
+
+ end if;
  
  
         
--- if(frame_number = "00000101") then
---    if(Tvalid_signal = '1' and M_AXIS_TREADY ='1') then
---      stream_data <= stream_data + 1;
---         
---         if(stream_data = stream_data + offset_value) then
---              Tlast_signal <= '1';
---
---             else
---             Tlast_signal <= '0';
---        
---            end if;
---            end if;
---
---end if;
+ if(frame_number = 4) then
+    if(Tvalid = '1' and M_AXIS_TREADY ='1') then
+      stream_data <= stream_data + 1;
+         counter <= counter +1;
+         if(stream_data = offset_value) then
+              Tlast <= '1';
+
+             else
+             Tlast <= '0';
+        
+            end if;
+            end if;
+
+end if;
      
      
-     
-     
-     
-     
-     
+     if(Tlast = '1') then
+        frame_number <= frame_number + 1;
+      end if;
+         
  
    end if; 
     end if;
+   
        end process;
        
 
-   process( M_AXIS_ACLK)
-   begin
-     if rising_edge(M_AXIS_ACLK) then
-        if(M_AXIS_ARESETN ='0') then       
-                frame_number <= "00000000";   
-         elsif( Tlast_signal = '1') then
-                 frame_number <= frame_number +1;
-             else
-                
-             end if;
-                                   
-        end if;
-  
-        end process;
-  
-  
   
     process( M_AXIS_ACLK)
       begin
          if rising_edge(M_AXIS_ACLK) then
             if(M_AXIS_ARESETN ='0') then       
-                  frame_number <= "00000000";   
+                  offset_value <= 0;   
              else
              
-             case frame_number is 
+      case frame_number is 
              
-             when "00000000" =>
-                offset_value <= 0;
-             when "00000001" =>
-                offset_value <= 1534;   
-             when "00000010" =>
-                  offset_value <= 2302;
-              end case;
+             when 0 =>
+             
+              Tvalid <= '1';
+           if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+              Tvalid <= '0';
+             end if;
+           --offset_value <= first_frame_size;
+             if(counter = first_frame_size+1) then
+             offset_value <= counter + 1279;
+                end if; 
+         
+             when 1 =>
+             Tvalid <= '1';
+              if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+              Tvalid <= '0';
+                end if;
+           
+                if(counter = offset_value ) then
+                 offset_value <= counter + 768;
+                end if; 
+          
+             when 2 =>
+             
+               Tvalid <= '1';
+               if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+                Tvalid <= '0';
+                end if;
+              if(counter = offset_value) then
+               offset_value <= counter + 1024;
+                end if; 
+              
+             when 3 =>
+               Tvalid <= '1';
+               if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+                 Tvalid <= '0';
+                end if;
+             if(counter = offset_value ) then
+               offset_value <= counter + 2048;
+               end if;
+                  
+              when others =>
+                  offset_value <= 0;    
+          end case;
             
                         
                  end if;
@@ -235,27 +267,28 @@ begin
 
 
    
-    process(M_AXIS_ACLK)
-    begin
-     if rising_edge(M_AXIS_ACLK) then
-       if(M_AXIS_ARESETN ='0') then
-            Tvalid_signal <= '0';
-         elsif( ct = 1) then
-          Tvalid_signal <= '1';
-          else
-           ct <= ct + 1;
-         end if;
-         end if;
-         end process;
+ --  process(M_AXIS_ACLK)
+ --  begin
+ --   if rising_edge(M_AXIS_ACLK) then
+ --     if(M_AXIS_ARESETN ='0') then
+ --          Tvalid_signa <= '0';
+ --       elsif( ct = 1) then
+ --        Tvalid_signal <= '1';
+ --        else
+ --         ct <= ct + 1;
+ --       end if;
+ --       end if;
+ --       end process;
              
                            
                                
-                     M_AXIS_TLAST <= Tlast_signal;
+                     M_AXIS_TLAST <= Tlast;
                      
                      M_AXIS_TDATA <= AXIS_data;
                                     
-                     M_AXIS_TVALID <= Tvalid_signal;
-                    AXIS_data <= std_logic_vector(to_unsigned(stream_data, AXIS_data'length)); 
+                     M_AXIS_TVALID <= Tvalid;
+                     
+                     AXIS_data <= std_logic_vector(to_unsigned(stream_data, AXIS_data'length)); 
                
                                     
                    
