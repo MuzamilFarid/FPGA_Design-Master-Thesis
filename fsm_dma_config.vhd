@@ -68,7 +68,7 @@ entity fsm_dma_config is
  dataR  : in std_logic_vector(31 downto 0);
  Rvalid : in std_logic;
  last_transfer : out std_logic;
- s2mm_valid : out std_logic;
+ s2mm_v : out std_logic;
  wvalid : in std_logic;
  wready : in std_logic;
  Bready : in std_logic
@@ -78,12 +78,13 @@ end fsm_dma_config;
 
 architecture Behavioral of fsm_dma_config is
 
-type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, dma_stop, mm2s_start, dram_sa, mm2s_length,length_data, stop_dma, mm2s_read,mm2s_status,mm2s_stop,dma_data,dram_data);
+type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, mm2s_start, dram_sa, mm2s_length, stop_dma, mm2s_read,mm2s_status,mm2s_stop);
 
 signal dma_state : state_m;
 
 
-signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
+--signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
+signal DMEM_Addr : std_logic_vector := x"40000000";
 signal drcntr   : std_logic;
 signal dsignal : integer := 0;
 signal asignal  : std_logic := '0';
@@ -106,6 +107,7 @@ signal chck_signal   : std_logic := '0';
 signal start_write_data : std_logic := '0';
 signal start_writing_data : std_logic;
 signal ctr       : integer := 0;
+signal s2mm_valid : std_logic := '0';  
 
 
 constant dma_init_reg_addr : integer := 48;
@@ -431,7 +433,7 @@ begin
       if(rst = '0') then
       
         recon <= '0';
-        last_transfer <= '0';
+        
         
        elsif(dataR = "00000000000000000001000000000010") then
           
@@ -443,7 +445,8 @@ begin
              if(countrec = Desired_DMA_Transfers-1) then
                stopcore <= '1';
                countrec <= 0;
-               last_transfer <= '1';
+              -- last_transfer <= '1';
+               --s2mm_v <= '0';
              
               end if;
             end if;
@@ -452,7 +455,7 @@ begin
          recon <= '0';      
          stopcore <= '0';
          rsignal <= '0';
-         last_transfer <= '0';
+         
 
    end if;
    end if;
@@ -501,6 +504,31 @@ begin
          end process;              
 
    start_read <=  start_reading;
+
+
+  process(clk)
+  begin
+  if rising_edge(clk) then
+     if (rst = '0') then
+        s2mm_v <= '0';
+        last_transfer <= '0';
+      elsif(s2mm_valid = '1') then
+           s2mm_v <= '1';
+          else
+          s2mm_v <= '0';
+          end if;
+       if(stopcore = '1') then
+         last_transfer <= '1';
+         else
+         last_transfer <= '0';
+         --s2mm_v <= '0';
+           end if;
+           end if;
+         
+           end process;
+                 
+
+
 
 
 

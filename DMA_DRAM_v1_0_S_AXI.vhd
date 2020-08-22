@@ -17,6 +17,8 @@ entity DMA_DRAM_v1_0_S_AXI is
 	port (
 		-- Users to add ports here
       s2mm_last_transfer : in std_logic;
+      last_mm2s_transfer : in std_logic;
+      mm2s_valid_s       : in std_logic;
       s2mm_valid_s : in std_logic;
 		-- User ports ends
 		-- Do not modify the ports beyond this line
@@ -83,6 +85,8 @@ entity DMA_DRAM_v1_0_S_AXI is
 		S_AXI_RREADY	: in std_logic
 		
 		
+		
+		
 	);
 end DMA_DRAM_v1_0_S_AXI;
 
@@ -115,6 +119,8 @@ architecture arch_imp of DMA_DRAM_v1_0_S_AXI is
 	signal slv_reg1	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg2	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg3	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+	signal slv_signal : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+	signal mm2s_slv_signal : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg_rden	: std_logic;
 	signal slv_reg_wren	: std_logic;
 	signal reg_data_out	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
@@ -127,8 +133,11 @@ architecture arch_imp of DMA_DRAM_v1_0_S_AXI is
     clk  : in std_logic;
     rst  : in std_logic;
     s2mm_last_transfer : in std_logic;
+    last_mm2s_transfer : in std_logic;
+    mm2s_valid_s      : in std_logic;
     s2mm_valid_s : in std_logic;
-    cntr : out std_logic_vector(31 downto 0)
+    cntr : out std_logic_vector(31 downto 0);
+    mm2s_cntr : out std_logic_vector(31 downto 0)
      );
   end component;
 
@@ -142,8 +151,11 @@ begin
     clk => S_AXI_ACLK,
     rst => S_AXI_ARESETN,
     s2mm_last_transfer => s2mm_last_transfer,
+    mm2s_valid_s => mm2s_valid_s,
+    last_mm2s_transfer     => last_mm2s_transfer,
     s2mm_valid_s => s2mm_valid_s,
-    cntr => slv_reg1
+    cntr => slv_signal,
+    mm2s_cntr => mm2s_slv_signal 
     
     );
 
@@ -235,7 +247,6 @@ begin
 	-- Slave register write enable is asserted when valid address and data are available
 	-- and the slave is ready to accept the write address and write data.
 	slv_reg_wren <= axi_wready and S_AXI_WVALID and axi_awready and S_AXI_AWVALID ;
-      
     
 	process (S_AXI_ACLK)
 	variable loc_addr :std_logic_vector(OPT_MEM_ADDR_BITS downto 0); 
@@ -243,7 +254,7 @@ begin
 	  if rising_edge(S_AXI_ACLK) then 
 	    if S_AXI_ARESETN = '0' then
 	      slv_reg0 <= (others => '0');
-	      --slv_reg1 <= (others => '0');
+	      slv_reg1 <= (others => '0');
 	      slv_reg2 <= (others => '0');
 	      slv_reg3 <= (others => '0');
 	    else
@@ -258,14 +269,16 @@ begin
 	                slv_reg0(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
 	              end if;
 	            end loop;
-	     --     when b"01" =>
-	     --       for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
-	     --         if ( S_AXI_WSTRB(byte_index) = '1' ) then
-	     --           -- Respective byte enables are asserted as per write strobes                   
-	     --           -- slave registor 1
-	     --           slv_reg1(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
-	     --         end if;
-	     --       end loop;
+	         when b"01" =>
+	        
+	           for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+	             if ( S_AXI_WSTRB(byte_index) = '1' ) then
+	               -- Respective byte enables are asserted as per write strobes                   
+	               -- slave registor 1
+	               slv_reg1(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+	             end if;
+	           end loop;
+	         
 	          when b"10" =>
 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
@@ -284,11 +297,14 @@ begin
 	            end loop;
 	          when others =>
 	            slv_reg0 <= slv_reg0;
-	            --slv_reg1 <= slv_reg1;
-	            
+	            slv_reg1 <= slv_reg1;  
 	            slv_reg2 <= slv_reg2;
 	            slv_reg3 <= slv_reg3;
 	        end case;
+	      else
+	          slv_reg1 <= slv_signal;
+	          slv_reg2 <= mm2s_slv_signal;
+	          
 	      end if;
 	    end if;
 	  end if;                   
@@ -385,6 +401,7 @@ begin
 	      when b"00" =>
 	        reg_data_out <= slv_reg0;
 	      when b"01" =>
+	         
 	        reg_data_out <= slv_reg1;
 	      when b"10" =>
 	        reg_data_out <= slv_reg2;
