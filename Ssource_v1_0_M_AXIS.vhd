@@ -14,7 +14,8 @@ entity Ssource_v1_0_M_AXIS is
 		C_M_AXIS_TDATA_WIDTH	: integer	:= 32;
 		-- Start count is the number of clock cycles the master will wait before initiating/issuing any transaction.
 		C_M_START_COUNT	: integer	:= 32;
-		Desired_Number_of_Frames      : integer := 5
+		 FrameLength    : integer := 768
+	
 	);
 	
 	port (
@@ -36,7 +37,9 @@ entity Ssource_v1_0_M_AXIS is
 		-- TLAST indicates the boundary of a packet.
 		M_AXIS_TLAST	: out std_logic;
 		-- TREADY indicates that the slave can accept a transfer in the current cycle.
-		M_AXIS_TREADY	: in std_logic
+		M_AXIS_TREADY	: in std_logic;
+		
+		counter_out   : out std_logic_vector(31 downto 0)
 		
 		
 	);
@@ -53,25 +56,18 @@ end Ssource_v1_0_M_AXIS;
 	signal Tvalid      : std_logic := '0';
 	signal Tlast        : std_logic := '0';
 	signal counter              : integer := 0;
-	signal ctr   : integer := 0;
-	signal frame_1   : std_logic := '0';
-	signal frame_2    : std_logic := '0';
+	
 	signal frame_number : integer := 0;
-	signal offset_value  : integer := 0;
-	signal countreg : integer := -1;
-	signal base_value : integer := 0;
-	signal first_frame_size : integer := 254;
-	signal start_frame : std_logic := '0';
+
+	signal stream_start      : integer:= 0;
+	signal rsignal  : std_logic := '0';
+	signal c_out : integer := 0;
+	signal sig : std_logic := '0';
 	
 	
-
-
 begin
                                                             
 
-	-- Add user logic here
-    
-    --  Design for the M_AXIS_TData where data is datat 32 bits and is incremented whenevr tready and tvalid are high
       
      process(M_AXIS_ACLK)
    
@@ -87,10 +83,8 @@ begin
        
     else
     
-    
-    
-         
-         if(frame_number = 0) then
+     
+       Tvalid <= '1';
              
               if(Tvalid = '1' and M_AXIS_TREADY ='1') then
            
@@ -98,93 +92,134 @@ begin
                  counter <= counter + 1;
               
             
-                  if(stream_data = first_frame_size) then
+                  if(counter = FrameLength-1) then
                         Tlast <= '1';
+                       
+                        c_out <= counter+1;
               
                     else
-                       Tlast <= '0';       
+                       Tlast <= '0';
+                     
+                              
+                          end if;
+               if(Tlast = '1') then
+                  Tlast <= '0';
+                  counter <= 0;
+                
+                  Tvalid <= '0';
+            end if;
             
-             end if;
+          
              
          end if;
                          
-         end if;
+  
        
-       if(frame_number = 1) then
        
-           
-          if(Tvalid = '1' and M_AXIS_TREADY ='1') then
-            stream_data <= stream_data + 1;
-            counter <= counter + 1;
-          
-               
-               if(stream_data = offset_value) then
-                    Tlast <= '1';
-
-                   else
-                   Tlast <= '0';
-              
-                  end if;
-                  end if;
- 
-     end if;
+   --    if(frame_number = 1) then
+   --    
+   --        
+   --       if(Tvalid = '1' and M_AXIS_TREADY ='1') then
+   --         stream_data <= stream_data + 1;
+   --         counter <= counter + 1;
+   --       
+   --            
+   --            if(counter = 1279) then
+   --                 counter <= 0;
+   --                 Tlast <= '1';
+   --
+   --                else
+   --                Tlast <= '0';
+   --           
+   --               end if;
+   --                    if(Tlast = '1') then
+   --                          Tlast <= '0';
+   --                          sig <= '1';
+   --                         
+   --                    end if;
+   --                      
+   --               
+   --               end if;
+   --
+   --  end if;
      
            
-     if(frame_number = 2) then
-        if(Tvalid = '1' and M_AXIS_TREADY ='1') then
-          stream_data <= stream_data + 1;
-          counter <= counter + 1;
-             
-             if(stream_data = offset_value) then
-                  Tlast <= '1';
-
-                 else
-                 Tlast <= '0';
-            
-                end if;
-                end if;
-
-   end if; 
+  --   if(frame_number = 2) then
+  --      if(Tvalid = '1' and M_AXIS_TREADY ='1') then
+  --        stream_data <= stream_data + 1;
+  --        counter <= counter + 1;
+  --           
+  --           if(counter = 768) then
+  --                Tlast <= '1';
+  --              counter <= 0;
+  --               else
+  --               Tlast <= '0';
+  --          
+  --              end if;
+  --                    if(Tlast = '1') then
+  --                         Tlast <= '0';
+  --                         sig <= '1';
+  --                   end if;
+  --                    
+  --              end if;
+  --
+  -- end if; 
      
             
-   if(frame_number = 3) then
-      if(Tvalid = '1' and M_AXIS_TREADY ='1') then
-        stream_data <= stream_data + 1;
-         counter <= counter + 1;
-           
-           if(stream_data = offset_value) then
-                Tlast <= '1';
-
-               else
-               Tlast <= '0';
-          
-              end if;
-              end if;
-
- end if;
+ --  if(frame_number = 3) then
+ --     if(Tvalid = '1' and M_AXIS_TREADY ='1') then
+ --       stream_data <= stream_data + 1;
+ --        counter <= counter + 1;
+ --          
+ --          if(counter = 1024) then
+ --               Tlast <= '1';
+ --               counter <= 0;
+ --
+ --              else
+ --              Tlast <= '0';
+ --         
+ --             end if;
+ --                    if(Tlast = '1') then
+ --                        Tlast <= '0';
+ --                       
+ --                        sig <= '1';
+ --                  end if;
+ --                  
+ --             end if;
+ --
+ --end if;
  
  
         
- if(frame_number = 4) then
-    if(Tvalid = '1' and M_AXIS_TREADY ='1') then
-      stream_data <= stream_data + 1;
-         counter <= counter +1;
-         if(stream_data = offset_value) then
-              Tlast <= '1';
-
-             else
-             Tlast <= '0';
-        
-            end if;
-            end if;
-
-end if;
+ --if(frame_number = 4) then
+ --   if(Tvalid = '1' and M_AXIS_TREADY ='1') then
+ --     stream_data <= stream_data + 1;
+ --        counter <= counter +1;
+ --        if(counter = 2048) then
+ --             Tlast <= '1';
+ --             counter <= 0;
+ --             
+ --
+ --            else
+ --            Tlast <= '0';
+ --       
+ --           end if;
+ --                  if(Tlast = '1') then
+ --                      Tlast <= '0';
+ --                  
+ --                      sig <= '1';
+ --                end if;
+ --                
+ --           end if;
+ --
+ --end if;
      
      
-     if(Tlast = '1') then
-        frame_number <= frame_number + 1;
-      end if;
-         
+ --    if(sig = '1') then
+ --       frame_number <= frame_number + 1;
+ --       sig <= '0';
+ --     end if;
+     
  
    end if; 
     end if;
@@ -193,95 +228,57 @@ end if;
        
 
   
-    process( M_AXIS_ACLK)
-      begin
-         if rising_edge(M_AXIS_ACLK) then
-            if(M_AXIS_ARESETN ='0') then       
-                  offset_value <= 0;   
-             else
-             
-      case frame_number is 
-             
-             when 0 =>
-             
-              Tvalid <= '1';
-           if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
-              Tvalid <= '0';
-             end if;
-           --offset_value <= first_frame_size;
-             if(counter = first_frame_size+1) then
-             offset_value <= counter + 1279;
-                end if; 
-         
-             when 1 =>
-             Tvalid <= '1';
-              if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
-              Tvalid <= '0';
-                end if;
-           
-                if(counter = offset_value ) then
-                 offset_value <= counter + 768;
-                end if; 
-          
-             when 2 =>
-             
-               Tvalid <= '1';
-               if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
-                Tvalid <= '0';
-                end if;
-              if(counter = offset_value) then
-               offset_value <= counter + 1024;
-                end if; 
-              
-             when 3 =>
-               Tvalid <= '1';
-               if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
-                 Tvalid <= '0';
-                end if;
-             if(counter = offset_value ) then
-               offset_value <= counter + 2048;
-               end if;
-                  
-              when others =>
-                  offset_value <= 0;    
-          end case;
-            
-                        
-                 end if;
-                                           
-              end if;
-          
-           end process;
-          
-          
-  
-  
-        
-               
-
-
-
-
-
-
-
-
-   
- --  process(M_AXIS_ACLK)
- --  begin
- --   if rising_edge(M_AXIS_ACLK) then
- --     if(M_AXIS_ARESETN ='0') then
- --          Tvalid_signa <= '0';
- --       elsif( ct = 1) then
- --        Tvalid_signal <= '1';
- --        else
- --         ct <= ct + 1;
- --       end if;
- --       end if;
- --       end process;
-             
-                           
-                               
+--   process( M_AXIS_ACLK)
+--     begin
+--        if rising_edge(M_AXIS_ACLK) then
+--           if(M_AXIS_ARESETN ='0') then       
+--                 Tvalid <= '0';   
+--            else
+--  
+--             Tvalid <= '1';
+--          if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+--             Tvalid <= '0';
+--            end if;
+---
+ ---            when 1 =>
+ ---            
+ ---             Tvalid <= '1';
+ ---             if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+ ---             Tvalid <= '0';
+ ---               end if;
+ ---        
+ ---         
+ ---            when 2 =>
+ ---            
+ ---              Tvalid <= '1';
+ ---              if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+ ---               Tvalid <= '0';
+ ---               end if;
+ ---        
+ ---            when 3 =>
+ ---              Tvalid <= '1';
+ ---              if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+ ---                Tvalid <= '0';
+ ---               end if;
+ ---             when 4 =>
+ ---           
+ ---           -- For more frames, add Tvalid signal for the next frame here
+ ---              if(Tvalid = '1' and M_AXIS_TREADY = '1' and Tlast = '1') then
+ ---                Tvalid <= '0';
+ ---               end if;
+ ---           
+ ---             when others =>
+ ---                Tvalid <= '0';
+ --       
+ --          
+ --                      
+ --               end if;
+ --                                         
+ --            end if;
+ --        
+ --         end process;
+ --         
+                       
                      M_AXIS_TLAST <= Tlast;
                      
                      M_AXIS_TDATA <= AXIS_data;
@@ -290,7 +287,7 @@ end if;
                      
                      AXIS_data <= std_logic_vector(to_unsigned(stream_data, AXIS_data'length)); 
                
-                                    
+                     counter_out <= std_logic_vector(to_unsigned(c_out,counter_out'length));               
                    
                         
                  

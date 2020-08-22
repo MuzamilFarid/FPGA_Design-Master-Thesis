@@ -16,7 +16,8 @@ entity Ssource_v1_0 is
 		-- Parameters of Axi Master Bus Interface M_AXIS
 		C_M_AXIS_TDATA_WIDTH	: integer	:= 32;
 		C_M_AXIS_START_COUNT	: integer	:= 32;
-		Desired_Number_of_Frames       : integer := 5
+		FrameLength : integer := 768
+		
 		
 	);
 	port (
@@ -37,7 +38,8 @@ entity Ssource_v1_0 is
 		m_axis_tdata	: out std_logic_vector(C_M_AXIS_TDATA_WIDTH-1 downto 0);
 		m_axis_tstrb	: out std_logic_vector((C_M_AXIS_TDATA_WIDTH/8)-1 downto 0);
 		m_axis_tlast	: out std_logic;
-		m_axis_tready	: in std_logic
+		m_axis_tready	: in std_logic;
+		counter_out   : out std_logic_vector(31 downto 0)
 		
 	
             -- component declaration
@@ -59,7 +61,8 @@ signal tlasts    : std_logic;
 		generic (
 		C_M_AXIS_TDATA_WIDTH	: integer	:= 32;
 		C_M_START_COUNT	: integer	:= 32;
-		Desired_Number_of_Frames  : integer := 5
+		FrameLength : integer := 768
+	
 		
 		);
 		port (
@@ -72,7 +75,8 @@ signal tlasts    : std_logic;
 		M_AXIS_TDATA	: out std_logic_vector(C_M_AXIS_TDATA_WIDTH-1 downto 0);
 		M_AXIS_TSTRB	: out std_logic_vector((C_M_AXIS_TDATA_WIDTH/8)-1 downto 0);
 		M_AXIS_TLAST	: out std_logic;
-		M_AXIS_TREADY	: in std_logic
+		M_AXIS_TREADY	: in std_logic;
+		counter_out : out std_logic_vector(31 downto 0)
 		);
 	end component Ssource_v1_0_M_AXIS;
 
@@ -90,7 +94,8 @@ inst : Ssource_v1_0_M_AXIS
 	generic map (
 		C_M_AXIS_TDATA_WIDTH	=> C_M_AXIS_TDATA_WIDTH,
 		C_M_START_COUNT	=> C_M_AXIS_START_COUNT,
-		Desired_Number_of_Frames  => Desired_Number_of_Frames 
+		FrameLength => FrameLength
+
 		
 	)
 	
@@ -104,7 +109,8 @@ inst : Ssource_v1_0_M_AXIS
 		M_AXIS_TDATA	=> m_axis_tdata,
 		M_AXIS_TSTRB	=> m_axis_tstrb,
 		M_AXIS_TLAST	=> m_axis_tlast,
-		M_AXIS_TREADY	=> m_axis_tready
+		M_AXIS_TREADY	=> m_axis_tready,
+		counter_out => counter_out
 		
 	);
 
