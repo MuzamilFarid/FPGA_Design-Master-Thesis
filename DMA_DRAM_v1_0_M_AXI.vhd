@@ -94,11 +94,8 @@ entity DMA_DRAM_v1_0_M_AXI is
 		start_trans : in std_logic;
 		--s2mm_wdata  : in std_logic_vector(31 downto 0);
 		s2mm_v : out std_logic;
-		mm2s_v : out std_logic;
-		mm2s_last_transfer : out std_logic;
 		
-		last_transfer : out std_logic;
-		frame_length : in std_logic_vector(31 downto 0)
+		last_transfer : out std_logic
 		
 		
 	);
@@ -240,12 +237,9 @@ architecture implementation of DMA_DRAM_v1_0_M_AXI is
   dataR : in std_logic_vector(31 downto 0);
   last_transfer : out std_logic;
   s2mm_v : out std_logic;
-  mm2s_v  : out std_logic;
-  mm2s_last_transfer : out std_logic;
   start_write_d : out std_logic;
-  Bready     : in std_logic;
-  frame_length : in std_logic_vector(31 downto 0)
-
+  Bready     : in std_logic
+  
   
    );
 end component;
@@ -784,12 +778,9 @@ begin
      dataR => M_AXI_RDATA,
      Rvalid => M_AXI_RVALID,
      s2mm_v => s2mm_v,
-     mm2s_v => mm2s_v,
-     mm2s_last_transfer => mm2s_last_transfer, 
      last_transfer => last_transfer,
      start_write_d => start_write_d,
-     Bready => axi_bready,
-     frame_length => frame_length
+     Bready => axi_bready
       );
 
 

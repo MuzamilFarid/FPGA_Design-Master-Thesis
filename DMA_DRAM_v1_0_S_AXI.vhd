@@ -17,8 +17,6 @@ entity DMA_DRAM_v1_0_S_AXI is
 	port (
 		-- Users to add ports here
       s2mm_last_transfer : in std_logic;
-      last_mm2s_transfer : in std_logic;
-      mm2s_valid_s       : in std_logic;
       s2mm_valid_s : in std_logic;
 		-- User ports ends
 		-- Do not modify the ports beyond this line
@@ -120,7 +118,6 @@ architecture arch_imp of DMA_DRAM_v1_0_S_AXI is
 	signal slv_reg2	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg3	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_signal : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-	signal mm2s_slv_signal : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg_rden	: std_logic;
 	signal slv_reg_wren	: std_logic;
 	signal reg_data_out	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
@@ -133,11 +130,8 @@ architecture arch_imp of DMA_DRAM_v1_0_S_AXI is
     clk  : in std_logic;
     rst  : in std_logic;
     s2mm_last_transfer : in std_logic;
-    last_mm2s_transfer : in std_logic;
-    mm2s_valid_s      : in std_logic;
     s2mm_valid_s : in std_logic;
-    cntr : out std_logic_vector(31 downto 0);
-    mm2s_cntr : out std_logic_vector(31 downto 0)
+    cntr : out std_logic_vector(31 downto 0)
      );
   end component;
 
@@ -151,11 +145,8 @@ begin
     clk => S_AXI_ACLK,
     rst => S_AXI_ARESETN,
     s2mm_last_transfer => s2mm_last_transfer,
-    mm2s_valid_s => mm2s_valid_s,
-    last_mm2s_transfer     => last_mm2s_transfer,
     s2mm_valid_s => s2mm_valid_s,
-    cntr => slv_signal,
-    mm2s_cntr => mm2s_slv_signal 
+    cntr => slv_signal 
     
     );
 
@@ -303,7 +294,6 @@ begin
 	        end case;
 	      else
 	          slv_reg1 <= slv_signal;
-	          slv_reg2 <= mm2s_slv_signal;
 	          
 	      end if;
 	    end if;
