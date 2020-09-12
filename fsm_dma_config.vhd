@@ -83,7 +83,7 @@ entity fsm_dma_config is
   );
 end fsm_dma_config;
 
-architecture Behavioral of fsm_dma_config is
+ architecture Behavioral of fsm_dma_config is
 
 type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, mm2s_start, dram_sa, mm2s_length, stop_dma, mm2s_read,mm2s_status,mm2s_stop);
 
@@ -143,6 +143,7 @@ signal FIFO_content : FIFO := (others => (others => '0'));
 signal wr_ptr :  integer range 0 to FIFO_depth-1;
 
 signal rd_ptr  : integer range 0 to FIFO_depth-1;
+signal sec_rd_ptr  : integer range 0 to FIFO_depth-1;
 
 signal empty_flag : std_logic := '0';
 signal full_flag  : std_logic := '0';
@@ -177,16 +178,49 @@ signal mm2s_cycle_ctrl  : std_logic := '0';
 signal Base_MM2S_Addr   : std_logic_vector(31 downto 0) := (others => '0');
 signal mm2s_other_rows : std_logic := '0';
 signal counter_number : integer := 0;
-signal counter_assert : std_logic := '0';
+signal count_assert   : std_logic := '0';
+signal Sec_base_MM2S_Addr : integer := 0;
+signal sec_mm2s_offset    : integer := 0;
+signal ctrl_shift     : std_logic := '0';
+signal dram_fb_ctrl   : std_logic := '0';
+signal mm2s_base_ctrl : std_logic := '0';
+signal mm2s_sec_rsignal : std_logic := '0';
+signal rd_counter       : integer :=0;
+signal reverse_ptr_ctrl    : std_logic := '0';
+signal new_image_trigger      : std_logic := '0';
+signal Write_DMEM_Addr : integer := 0;
+signal fb_shift_wr     : std_logic := '0';
+signal shift_offset    : integer := 0;
+signal add_shift_offset : integer := 0;
+signal neg_rd_ctr       : integer := 4;
+signal shift_counter   : integer := 0;
+signal count_neg   : integer := 0;
+signal shift_reverse  : std_logic := '0';
+signal count_turnoff_neg : integer := 0;
+signal mm2s_shift_other_rows : std_logic := '0';
+signal rnd_counter   : std_logic := '0';
+signal rnd_turnoff_counter  : std_logic := '0';
+signal shift_assert  : std_logic := '0';
+signal cycle_turn_shift_rise   : std_logic := '0';
+signal shift_incrementer      : integer := 0;
+signal add_cycle_turnoff_offset    : integer := 0;
+signal add_shift_rise_offset      : integer := 0;
+signal shift_incrementer_shift    : integer := 0;
+signal cylce_shift_rise         : std_logic := '0';
+signal end_buf_shift       : integer := 0;
+signal end_buf_sig      : integer := 0;
+signal end_buf_iter     : std_logic := '0';
+signal end_buf_other_rows  : std_logic := '0';
+signal cntrl_count_turnoff   : std_logic := '0';
 
-
-
- 
 
 begin
 
 
 process(clk)
+
+variable internal_shift_counter : integer := 0;  
+variable internal_turnoff_counter : integer := 0;
 
 begin
  if rising_edge(clk) then
@@ -257,10 +291,21 @@ begin
 
    
  addrw <= std_logic_vector(to_unsigned(dma_dram_reg_addr, 32));
-  if(drcntr = '1') then
-  dataw <= DMEM_Addr;
-  drcntr <= '0';
-  end if;
+  
+     
+  if(fb_shift_wr = '1') then
+      Write_DMEM_Addr <= Write_DMEM_Addr + 1024;
+        dataw <= std_logic_vector(unsigned(DMEM_Addr) + Write_DMEM_Addr);
+        fb_shift_wr <= '0';
+     end if;
+     
+     
+     
+     if(drcntr = '1') then
+      dataw <= DMEM_Addr;
+       drcntr <= '0';
+
+          end if;
   
  if(dram_alert = '1') then
      
@@ -306,38 +351,6 @@ begin
      
       addrw <= std_logic_vector(to_unsigned(dma_length_reg_addr, 32));
 
-        
-        -- 1Mb
-        
-        --dataw <= "00000000000100000000000000000000"; 
-         --Output_data <= "00000000000100000000000000000000" ;
-     
-       -- 500kb
-     
-       -- dataw <= "00000000000001111101000000000000";
-     
-     -- 100kb
-      
-      -- dataw <=  "00000000000000011001000000000000";
-     
-     
-     -- 50kb
-        --dataw <= "00000000000000001100100000000000";
-  
-      
-      -- 15Kb
-      
-       -- dataw <= "00000000000000000011110000000000";
-       -- 13Kb
-       -- dataw <=  "00000000000000000011010000000000";
-     
-      -- 10kb
-        --dataw <=  "00000000000000000010100000000000";
-      -- 5kb
-      --dataw <= "00000000000000000001010000000000";
-      
-      -- 3kb
-      --dataw <= "00000000000000000000110000000000";
       
       -- 1kb
       dataw<=  "00000000000000000000010000000000";
@@ -368,20 +381,29 @@ begin
               else
               dma_state <= dma_read;
               
-            if(stopcore = '1' and recon = '1') then
-                   
-              dma_state <= stop_dma;
-              cntrlread <= '0';
-              recon_proc_ctrl <= '0';
+          -- if(stopcore = '1' and recon = '1') then
+                  
+            -- dma_state <= dram_sa;
+           --  cntrlread <= '0';
+           --  recon_proc_ctrl <= '0';
                       
-                  elsif(rsignal= '1') then
-                       dma_state <= dram_sa;
+                  if(rsignal= '1') then
+                      dma_state <= dram_sa;
                       recon_proc_ctrl <= '0';
-
-                       dram_alert <= '1';
+                       --dram_alert <= '1';
                        cntrlread <= '0';
-                        
-                                 
+                      if(shift_image = '1') then
+                      Sec_base_MM2S_Addr <=  Sec_base_MM2S_Addr + 1024;
+                   
+                          neg_rd_ctr <= neg_rd_ctr -1;
+                           dram_fb_ctrl <= '1';
+                          if(end_buf_sig = 5) then
+                              Sec_base_MM2S_Addr <= 0;
+                              end_buf_iter <= '1';
+                              end if;
+                    
+                    
+                         end if;        
                       else
                      dma_state <= dma_read;
                             end if;    
@@ -400,25 +422,6 @@ begin
          else
          dma_state <= dma_status;
          end if;
-         
-
-       when stop_dma =>
-               
-                 cntrlstart <= '1';
-                   cntrlread <= '0';
-                   
-             addrw <= std_logic_vector(to_unsigned(dma_init_reg_addr, 32));
-             dataw <= "00000000000000000000000000000000";
-             s2mm_valid <= '0';
-            
-                  if(Bvalid = '1' and Bready = '1') then
-                  dma_state <= dram_sa;
-                  --last_transfer <= '0';
-                   
-                  else
-                  dma_state <= stop_dma;
-                  end if;
-          
 
           
          when  dram_sa =>
@@ -435,11 +438,14 @@ begin
                   dma_state <= dram_sa;     
                   end if;    
      
-         
-                 if(mm2s_base_addr_cntrl = '1' or mm2s_cycle_ctrl = '1') then
-                     dataw <= std_logic_vector(unsigned(Base_MM2S_Addr) + mm2s_base_offset);
+            
+  
+                 if(mm2s_base_addr_cntrl = '1' or mm2s_cycle_ctrl = '1' or dram_fb_ctrl = '1') then
+                     dataw <= std_logic_vector(to_unsigned(Sec_base_MM2S_Addr,32) + mm2s_base_offset);
                      mm2s_base_addr_cntrl <= '0';
                      mm2s_cycle_ctrl <= '0';
+                     dram_fb_ctrl <= '0';
+                     mm2s_base_ctrl  <= '0';
                 
                   end if;
                   
@@ -456,27 +462,58 @@ begin
                       if( off_mm2s_addr = '1') then
                          
                           mm2s_asignal <= '1';
+                          if(shift_image = '1') then
+                          mm2s_offset <= sec_mm2s_offset;
+                          elsif(cycle_turn_off = '1') then
+                         -- add_cycle_turnoff_offset <= add_cycle_turnoff_offset +1024;
+                          mm2s_offset <= sec_mm2s_offset;
+                        
+                          else
                           mm2s_offset <= 1024 + mm2s_offset;
+                         
+                          end if;
                           off_mm2s_addr <= '0';
+                       
                        
                       end if; 
                       
                    
                   if(mm2s_asignal = '1' and mm2s_other_rows = '1') then
-                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr * 68) +16*counter_number,32));
+                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68) +16*counter_number,32));
                              mm2s_asignal <= '0';
                              mm2s_dsignal <= 0;
-                             mm2s_scntr <= mm2s_scntr + 1 ;
-                       
+                             mm2s_scntr <= mm2s_scntr +1;
+                              mm2s_other_rows <= '0';
+                    elsif (mm2s_asignal = '1' and mm2s_shift_other_rows = '1') then
+                             MM2S_DMEM <= std_logic_vector(to_unsigned(shift_offset + (rd_ptr*68) +16*counter_number,32));   
+                               mm2s_asignal <= '0';
+                               mm2s_dsignal <= 0;
+                               mm2s_scntr <= mm2s_scntr +1;
+                               mm2s_shift_other_rows <= '0';
+                               
+                       elsif(mm2s_asignal = '1' and shift_reverse = '1') then
+                           MM2S_DMEM <= std_logic_vector(to_unsigned(shift_offset + (rd_ptr*68),32));
+                            shift_reverse <= '0';
+                            mm2s_asignal <= '0';
+                             mm2s_dsignal <= 0;
+                            mm2s_scntr <= mm2s_scntr + 1 ;
+                            
+                        elsif(mm2s_asignal = '1' and shift_assert = '1') then
+                        
+                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68),32));
+                       mm2s_asignal <= '0';
+                      mm2s_dsignal <= 0;
+                      mm2s_scntr <= mm2s_scntr + 1 ;
+                      shift_assert <= '0';    
+                            
+                     
                        elsif(mm2s_asignal = '1') then
                         MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68),32));
-                        --  if( cycles_complete = '1') then
-                        -- MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*64+16),32));
-                        ---- MM2S_DMEM <= std_logic_vector(to_unsigned((Next_MM2S_Addr +4) , 32) + unsigned(MM2S_DMEM));
-                        -- end if;
+                         ctrl_shift <= '0'; 
                          mm2s_asignal <= '0';
                         mm2s_dsignal <= 0;
-                        mm2s_scntr <= mm2s_scntr + 1 ; 
+                        mm2s_scntr <= mm2s_scntr + 1 ;
+                        
              
                        
                         end if;
@@ -497,34 +534,7 @@ begin
                                 dataw <= "00000000000000000000000000010000";
                                 mm2s_output_data <=   "00000000000000000000000000010000";
                              
-                             
-                               -- 500kb
-                             
-                                --dataw <= "00000000000001111101000000000000";
-                             
-                             -- 100kb
-                              
-                              --dataw <=  "00000000000000011001000000000000";
-                             
-                             
-                             -- 50kb
-                               --dataw <= "00000000000000001100100000000000";
-                               
-                               -- 15Kb
-                                     
-                                      -- dataw <= "00000000000000000011110000000000";
-                             
-                              -- 10kb
-                              --dataw <= "00000000000000000010100000000000";
-                              -- 5kb
-                              --dataw <= "00000000000000000001010000000000";
-                              
-                              -- 3kb
-                              --dataw <= "00000000000000000000110000000000";
-                              
-                              -- 1kb
-                             -- dataw<=  "00000000000000000000010000000000";
-                               
+                 
                              
                     
                           mm2s_recon_proc_ctrl <= '1';
@@ -562,28 +572,169 @@ begin
                                           mm2s_base_offset <= mm2s_base_offset + 16;
                                           mm2s_cycle_ctrl <= '1';
                                           cycle_turn_off <= '1';
-                                          mm2s_offset <= 0;    
+                                          mm2s_base_ctrl <= '1';
+                                          mm2s_offset <= 0;
+                                          shift_image <= '0';
+                                          rnd_counter <= '0';
+                                          rnd_turnoff_counter <= '0';    
                                           counter_number <= counter_number +1;
-                                   
-                                      elsif(cycle_turn_off = '1' and mm2s_rsignal = '1') then
+                                           mm2s_recon_proc_ctrl <= '0';
+                                           sec_mm2s_offset <= 0;
+                                           shift_offset <= 0;
+                                           end_buf_iter <= '0';
+                                           end_buf_other_rows <= '1';
+                                           if(cntrl_count_turnoff = '1') then
+                                           count_turnoff_neg <= 4;
+                                           end if;
+                                      
+                                          
+                                         if(counter_number = 4 and rd_ptr =4) then
+                                         dma_state <= dram_addr;
+                                         counter_number <= 0;
+                                         shift_image <= '1';
+                                         mm2s_offset <= 0;
+                                         mm2s_other_rows <= '0';
+                                         cycle_turn_off <= '0';
+                                         mm2s_cycle_ctrl <= '1';
+                                         sec_mm2s_offset <= 0;
+                                         mm2s_base_offset <= 0;
+                                         fb_shift_wr <= '1';
+                                         count_turnoff_neg <= 0;
+                                         count_neg <= 0;
+                                         end_buf_other_rows <= '0';
+                                         DMEM_Addr <= (others => '0');
+                                    end if;   
+                                    
+                                  elsif(end_buf_iter = '1' and mm2s_rsignal = '1') then
+                                  
+                                         dma_state <= dram_sa;
+                                         shift_offset <= shift_offset + 1024;
+                                         mm2s_recon_proc_ctrl <= '0';
+                                         mm2s_dram_alert <= '1';
+                                         shift_reverse <= '1';  
+                                
+                                
+                                  elsif(end_buf_sig = 5) then
+                                          if( end_buf_other_rows = '1' and mm2s_rsignal = '1') then
+                                           
+                                          dma_state <= dram_sa;
+                                          shift_offset <= shift_offset + 1024;
+                                          mm2s_recon_proc_ctrl <= '0';
+                                          mm2s_dram_alert <= '1';
+                                          mm2s_shift_other_rows <= '1';
+                                                 end if;
+                                
+                                
+                                   elsif(shift_image = '1' and count_neg = neg_rd_ctr and mm2s_rsignal = '1') then
+                                          dma_state <= dram_sa;
+                                           
+                                           shift_offset <= 0;
+                                           shift_reverse <= '1';
+                                            mm2s_dram_alert <= '1';
+                                            count_neg <= 0;
+                                           rnd_counter <= '1';
+                                           shift_counter <= shift_counter +1;
+                                            mm2s_recon_proc_ctrl <= '0';
+                                            add_shift_rise_offset <= 0;
+                                                if(neg_rd_ctr = 0) then
+                                                    neg_rd_ctr <= 4;
+                                                    count_turnoff_neg <= 4;
+                                                    cntrl_count_turnoff <= '1';
+                                                    end if;
+                                            
+                                             
+                                         
+                                         elsif(shift_image = '1' and rnd_counter='1' and mm2s_rsignal = '1') then
+                                                   dma_state <= dram_sa;
+                                                  shift_offset <= shift_offset + 1024;
+                                                   mm2s_recon_proc_ctrl <= '0';
+                                                   mm2s_dram_alert <= '1';
+                                                   shift_reverse <= '1';
+                                              
+                                       
+                                         
+                                          elsif(shift_image = '1' and mm2s_rsignal = '1') then
+                                            dma_state <= dram_sa;
+                                            --sec_mm2s_offset <= sec_mm2s_offset + 1024;
+                                            mm2s_recon_proc_ctrl <= '0';
+                                            --count_neg <= count_neg+1;
+                                            mm2s_dram_alert <= '1';
+                                            shift_assert <= '1';
+                                               if(cylce_shift_rise = '1') then
+                                                     add_shift_rise_offset <= add_shift_rise_offset + 1024; 
+                                                    count_neg <= count_neg + 1;
+                                                     if(count_neg = neg_rd_ctr) then
+                                                              add_shift_rise_offset <= 0;
+                                                               sec_mm2s_offset <= 0;
+                                                              
+                                                         else
+                                                                 sec_mm2s_offset <= shift_incrementer_shift + 1024 + add_shift_rise_offset;
+                                                            end if;
+                                                         end if;        
+                                           
+                                        elsif(cycle_turn_off = '1' and count_turnoff_neg = neg_rd_ctr and mm2s_rsignal = '1') then
+                                         dma_state <= dram_sa;
+                                          
+                                          shift_offset <= 0;
+                                          mm2s_shift_other_rows <= '1';
+                                          mm2s_dram_alert <= '1';
+                                          count_turnoff_neg <= 0;
+                                          rnd_turnoff_counter <= '1';
+                                          shift_counter <= shift_counter +1;
+                                          mm2s_recon_proc_ctrl <= '0';
+                                           add_cycle_turnoff_offset <= 0;
+                                           sec_mm2s_offset <= 0;
+                                           
+                                               
+                                        
+                                        elsif(cycle_turn_off = '1' and rnd_turnoff_counter='1' and mm2s_rsignal = '1') then
+                                             dma_state <= dram_sa;
+                                                 shift_offset <= shift_offset + 1024;
+                                                  mm2s_recon_proc_ctrl <= '0';
+                                                  mm2s_dram_alert <= '1';
+                                                   mm2s_shift_other_rows <= '1';
+                                                  --shift_reverse <= '1';
+                                                    
+                                 
+                            
+                                          elsif(cycle_turn_off = '1' and mm2s_rsignal = '1') then
                                          
                                             dma_state <= dram_sa;
                                             mm2s_dram_alert <= '1';
                                             mm2s_other_rows <= '1';
+                                            mm2s_recon_proc_ctrl <= '0';
+                                            sec_mm2s_offset <= sec_mm2s_offset + 1024;
+                                           
+                                             if(cycle_turn_shift_rise = '1') then
+                                              add_cycle_turnoff_offset <= add_cycle_turnoff_offset + 1024;
+                                               count_turnoff_neg <= count_turnoff_neg + 1;
+                                               
+                                                if(count_turnoff_neg = neg_rd_ctr) then
+                                                add_cycle_turnoff_offset <= 0;
+                                                sec_mm2s_offset <= 0;
+                                                else
+                                                  
+                                                 sec_mm2s_offset <= shift_incrementer + 1024 + add_cycle_turnoff_offset;
+                                                 
+                                              end if;
                                             
-                                   
-                                   
-                                           elsif(mm2s_rsignal= '1') then
+                                            
+                                            end if;
+                                         
+                                      elsif(mm2s_rsignal= '1') then
                                                 dma_state <= dram_addr;
                                                 mm2s_dram_alert <= '1';
                                                 cntrlread <= '0';
-                                                 mm2s_recon_proc_ctrl <= '0';
+                                                mm2s_recon_proc_ctrl <= '0';
+                                                dram_alert <= '1';
                                                           
                                                else
                                               dma_state <= mm2s_read;
                                                      end if;    
-                                             end if;     
-                                              
+                                      end if;
+                                
+                                    
+                                          
                                        
              when mm2s_status =>
              cntrlstart <= '0';
@@ -678,37 +829,37 @@ begin
                if(mm2s_recon = '1') then
                mm2s_countrec <= mm2s_countrec + 1;
                mm2s_rsignal <= '1';
-        
-             if(mm2s_countrec = FIFO_depth-1) then
+               mm2s_sec_rsignal <= '0';
+               end if;
+         
+             if(rd_ptr = FIFO_depth-1 and mm2s_recon ='1') then
                mm2s_stopcore <= '1';
                mm2s_countrec <= 0;
                cycles_complete <= '1';
-               
-               
+             end if;
               -- last_transfer <= '1';
                --s2mm_v <= '0';
-             elsif(cycle_turn_off = '1') then
-                  cycles_complete <= '0';
-                
-              end if;
-              
-            end if;
+         
+     
                 
          else
          mm2s_recon <= '0';      
          mm2s_stopcore <= '0';
          mm2s_rsignal <= '0';
-        
-         
+         cycles_complete <= '0';
+         mm2s_sec_rsignal <= '1';
 
-   end if;
    end if;
    
+    
+ --  if(reverse_ptr_ctrl = '1') then
+ --    mm2s_countrec <= mm2s_countrec - 1;
+ --    
+ -- 
+ -- 
+  end if;
+   
           end process;         
-
-
-
-
 
 
 
@@ -810,13 +961,17 @@ begin
              wr_ptr <= 0;
             elsif(rsignal = '1') then
             wr_ptr <= wr_ptr +1;
-            FIFO_content(wr_ptr) <= Output_data;
+            --FIFO_content(wr_ptr) <= Output_data;
             
             end if;
             
             if(wr_ptr = FIFO_depth-1 and rsignal = '1') then
             wr_ptr_reg <= wr_ptr;
             wr_ptr <= 0;
+            
+         --   if(shift_image <= '1') then
+         --    wr_ptr <= wr_ptr +1;
+         --   end if; 
           
           end if;
           end if;
@@ -841,56 +996,95 @@ begin
     process(clk)
     begin
       if rising_edge(clk) then
-         if (rst = '0') then
-              count_pixels <= 0;
+        if (rst = '0') then
+             -- count_pixels <= 0;
               
-         
-               elsif(mm2s_rsignal = '1' ) then
+             
+               elsif(mm2s_rsignal = '1') then
                       --count_pixels <= count_pixels + 1;
                       rd_ptr <= rd_ptr + 1;
                       
+                      
+                      
+               elsif(dram_fb_ctrl = '1') then       
+                    rd_ptr <= 0;  
                
             end if;
+            
+       
            
            if(rd_ptr = FIFO_depth-1 and mm2s_rsignal = '1') then
        
                 rd_ptr <= 0;
+                
                 -- cycles_complete <= '1';
                  cycle_counter <= cycle_counter +1;
                  --mm2s_base_offset <= mm2s_base_offset + 16;
                 
-                
-            -- if(shift_image = '0') then
-            -- rd_ptr <= rd_ptr +1;
-            --  end if;
-     
+   
            end if;
-           
-       --    if(cycle_turn_off = '1') then
-       --       cycles_complete <= '0';
-       --       end if;
-             
+  
             
-            end if;
+           end if;
            
              
             end process;
                           
 
-      empty_flag <= '1' when fifo_count <= 0 else '0';
+  
       
-    process(cycle_counter)
-    begin
-     if (cycle_counter = 4) then
-        shift_image <= '1';
-      else
-         shift_image <= '0';
-         
-       end if;
-       end process;    
+   process(shift_image)
+    variable counter_end_entry : integer := 0;
+   begin
+    
+        if falling_edge(shift_image) then
+            cycle_turn_shift_rise <= '1';
+            shift_incrementer <= shift_incrementer + 1024;
+                counter_end_entry := counter_end_entry + 1;
+                     if(counter_end_entry = 4) then
+                             shift_incrementer <= 0;
+                             counter_end_entry := 0;
+                             end if;
+            end if;
+           
+               
+                end process; 
 
+
+      
+   process(shift_image)
+  
+   begin
+    
+        if rising_edge(shift_image) then
+            cylce_shift_rise <= '1';
+            shift_incrementer_shift <= shift_incrementer_shift + 1024;
+            end_buf_sig <= end_buf_sig + 1;
+            
         
             
+            end if;
+           
+               
+                end process; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
