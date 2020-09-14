@@ -212,6 +212,9 @@ signal end_buf_sig      : integer := 0;
 signal end_buf_iter     : std_logic := '0';
 signal end_buf_other_rows  : std_logic := '0';
 signal cntrl_count_turnoff   : std_logic := '0';
+signal fall_edge_wrap_ctr     : integer := 0;
+signal zero_sig_fb           : std_logic := '0';
+signal Sec_cntrl            : std_logic := '0';
 
 
 begin
@@ -294,9 +297,16 @@ begin
   
      
   if(fb_shift_wr = '1') then
+     if(zero_sig_fb = '1') then
+         Write_DMEM_Addr <= 0;
+         dataw <= std_logic_vector(unsigned(DMEM_Addr) + Write_DMEM_Addr);
+        fb_shift_wr <= '0';
+         
+      else   
       Write_DMEM_Addr <= Write_DMEM_Addr + 1024;
         dataw <= std_logic_vector(unsigned(DMEM_Addr) + Write_DMEM_Addr);
         fb_shift_wr <= '0';
+        end if;
      end if;
      
      
@@ -397,9 +407,10 @@ begin
                    
                           neg_rd_ctr <= neg_rd_ctr -1;
                            dram_fb_ctrl <= '1';
-                          if(end_buf_sig = 5) then
+                          if(Sec_cntrl = '1') then
                               Sec_base_MM2S_Addr <= 0;
                               end_buf_iter <= '1';
+                              neg_rd_ctr <= 4;
                               end if;
                     
                     
@@ -585,8 +596,12 @@ begin
                                            end_buf_other_rows <= '1';
                                            if(cntrl_count_turnoff = '1') then
                                            count_turnoff_neg <= 4;
+                                              if(end_buf_sig =6) then
+                                            cntrl_count_turnoff <= '0';
+                                             count_turnoff_neg <= 0;
                                            end if;
-                                      
+                                          end if;
+                                             
                                           
                                          if(counter_number = 4 and rd_ptr =4) then
                                          dma_state <= dram_addr;
@@ -599,10 +614,14 @@ begin
                                          sec_mm2s_offset <= 0;
                                          mm2s_base_offset <= 0;
                                          fb_shift_wr <= '1';
+                                         fall_edge_wrap_ctr <= fall_edge_wrap_ctr +1;
                                          count_turnoff_neg <= 0;
                                          count_neg <= 0;
                                          end_buf_other_rows <= '0';
                                          DMEM_Addr <= (others => '0');
+                                           if(zero_sig_fb = '1') then
+                                             Write_DMEM_Addr <= 0;
+                                            end if; 
                                     end if;   
                                     
                                   elsif(end_buf_iter = '1' and mm2s_rsignal = '1') then
@@ -1035,16 +1054,27 @@ begin
       
    process(shift_image)
     variable counter_end_entry : integer := 0;
+    variable counter_end_sec_entry : integer := 0;
    begin
     
         if falling_edge(shift_image) then
             cycle_turn_shift_rise <= '1';
             shift_incrementer <= shift_incrementer + 1024;
+            
                 counter_end_entry := counter_end_entry + 1;
-                     if(counter_end_entry = 4) then
+                counter_end_sec_entry := counter_end_sec_entry +1;
+                     if(counter_end_entry = 5) then
                              shift_incrementer <= 0;
                              counter_end_entry := 0;
                              end if;
+                             
+                      if(counter_end_sec_entry = 5) then
+                            zero_sig_fb <= '1';
+                            counter_end_sec_entry  := 0;
+                        else
+                             zero_sig_fb <= '0';
+                           end if;             
+                             
             end if;
            
                
@@ -1053,14 +1083,27 @@ begin
 
       
    process(shift_image)
-  
+  variable shift_incrementer_zero  : integer := 0;
    begin
     
         if rising_edge(shift_image) then
             cylce_shift_rise <= '1';
-            shift_incrementer_shift <= shift_incrementer_shift + 1024;
-            end_buf_sig <= end_buf_sig + 1;
             
+            shift_incrementer_shift <= shift_incrementer_shift + 1024;
+            shift_incrementer_zero := shift_incrementer_zero +1;
+            end_buf_sig <= end_buf_sig + 1;
+              if(end_buf_sig = 6) then
+                  end_buf_sig <= 0;
+                  end if;
+               if( shift_incrementer_zero = 5) then
+                     Sec_cntrl <= '1';
+                      shift_incrementer_shift <= 0;
+                       shift_incrementer_zero := 0;
+                     else
+                        Sec_cntrl <= '0';
+                      end if;
+                       
+              
         
             
             end if;
