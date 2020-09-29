@@ -23,7 +23,8 @@ entity DMA_DRAM_v1_0_M_AXI is
 		-- Transaction number is the number of write 
     -- and read transactions the master will perform as a part of this example memory test.
 		C_M_TRANSACTIONS_NUM	: integer	:= 4;
-		Desired_DMA_Transfers : integer := 5
+		Desired_DMA_Transfers : integer := 5;
+		FIFO_depth        : integer := 6
 	);
 	port (
 		-- Users to add ports here
@@ -94,8 +95,11 @@ entity DMA_DRAM_v1_0_M_AXI is
 		start_trans : in std_logic;
 		--s2mm_wdata  : in std_logic_vector(31 downto 0);
 		s2mm_v : out std_logic;
+		mm2s_v : out std_logic;
+		mm2s_last_transfer : out std_logic;
 		
-		last_transfer : out std_logic
+		last_transfer : out std_logic;
+		frame_length : in std_logic_vector(31 downto 0)
 		
 		
 	);
@@ -209,7 +213,8 @@ architecture implementation of DMA_DRAM_v1_0_M_AXI is
   
   generic (
   Base_DMA_Addr : std_logic_vector := x"41E00000";
-  Desired_DMA_Transfers : integer := 5
+  Desired_DMA_Transfers : integer := 5;
+  FIFO_depth     : integer := 6
   );
   
 
@@ -237,9 +242,12 @@ architecture implementation of DMA_DRAM_v1_0_M_AXI is
   dataR : in std_logic_vector(31 downto 0);
   last_transfer : out std_logic;
   s2mm_v : out std_logic;
+  mm2s_v  : out std_logic;
+  mm2s_last_transfer : out std_logic;
   start_write_d : out std_logic;
-  Bready     : in std_logic
-  
+  Bready     : in std_logic;
+  frame_length : in std_logic_vector(31 downto 0)
+
   
    );
 end component;
@@ -757,7 +765,8 @@ begin
     inst : fsm_dma_config
     generic map (
      Base_DMA_Addr => C_M_TARGET_SLAVE_BASE_ADDR,
-     Desired_DMA_Transfers => Desired_DMA_Transfers
+     Desired_DMA_Transfers => Desired_DMA_Transfers,
+     FIFO_depth  => FIFO_depth
      )
      port map(
      clk => M_AXI_ACLK,
@@ -778,9 +787,12 @@ begin
      dataR => M_AXI_RDATA,
      Rvalid => M_AXI_RVALID,
      s2mm_v => s2mm_v,
+     mm2s_v => mm2s_v,
+     mm2s_last_transfer => mm2s_last_transfer, 
      last_transfer => last_transfer,
      start_write_d => start_write_d,
-     Bready => axi_bready
+     Bready => axi_bready,
+     frame_length => frame_length
       );
 
 

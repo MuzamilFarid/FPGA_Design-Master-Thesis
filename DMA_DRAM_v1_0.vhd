@@ -20,7 +20,8 @@ entity DMA_DRAM_v1_0 is
 		C_M_AXI_ADDR_WIDTH	: integer	:= 32;
 		C_M_AXI_DATA_WIDTH	: integer	:= 32;
 		C_M_AXI_TRANSACTIONS_NUM	: integer	:= 4;
-		Desired_DMA_Transfers : integer := 5
+		Desired_DMA_Transfers : integer := 5;
+		FIFO_depth           : integer := 6
 	);
 	port (
 		-- Users to add ports here
@@ -52,7 +53,9 @@ entity DMA_DRAM_v1_0 is
 		s_axi_rvalid	: out std_logic;
 		s_axi_rready	: in std_logic;
 		s2mm_valid_s   : in std_logic;
+		mm2s_valid_s   : in std_logic;
 		s2mm_last_transfer   : in std_logic;
+		last_mm2s_transfer   : in std_logic;
 
 		-- Ports of Axi Master Bus Interface M_AXI
 		--m_axi_init_axi_txn	: in std_logic;
@@ -81,7 +84,10 @@ entity DMA_DRAM_v1_0 is
 		m_axi_rready	: out std_logic;
 		start_trans     : in std_logic;
 		last_transfer : out std_logic;
-		s2mm_v    : out std_logic
+		mm2s_last_transfer : out std_logic;
+		mm2s_v  : out std_logic;
+		s2mm_v    : out std_logic;
+		frame_length : in std_logic_vector(31 downto 0)
 	);
 end DMA_DRAM_v1_0;
 
@@ -116,6 +122,8 @@ architecture arch_imp of DMA_DRAM_v1_0 is
 		S_AXI_RVALID	: out std_logic;
 		S_AXI_RREADY	: in std_logic;
 		s2mm_last_transfer : in std_logic;
+		mm2s_valid_s : in std_logic;
+		last_mm2s_transfer   : in std_logic;
 		s2mm_valid_s : in std_logic
 		);
 	end component DMA_DRAM_v1_0_S_AXI;
@@ -127,7 +135,8 @@ architecture arch_imp of DMA_DRAM_v1_0 is
 		C_M_AXI_ADDR_WIDTH	: integer	:= 32;
 		C_M_AXI_DATA_WIDTH	: integer	:= 32;
 		C_M_TRANSACTIONS_NUM	: integer	:= 4;
-		Desired_DMA_Transfers : integer := 5
+		Desired_DMA_Transfers : integer := 5;
+		FIFO_depth            : integer := 6
 		);
 		port (
 		--INIT_AXI_TXN	: in std_logic;
@@ -156,7 +165,10 @@ architecture arch_imp of DMA_DRAM_v1_0 is
 		M_AXI_RREADY	: out std_logic;
 		start_trans : in std_logic;
 		last_transfer  : out std_logic;
-		s2mm_v    : out std_logic
+		s2mm_v    : out std_logic;
+		mm2s_last_transfer    : out std_logic;
+		mm2s_v : out std_logic;
+		frame_length : in std_logic_vector(31 downto 0)
 		);
 	end component DMA_DRAM_v1_0_M_AXI;
 
@@ -191,7 +203,9 @@ DMA_DRAM_v1_0_S_AXI_inst : DMA_DRAM_v1_0_S_AXI
 		S_AXI_RVALID	=> s_axi_rvalid,
 		S_AXI_RREADY	=> s_axi_rready,
 		s2mm_last_transfer => s2mm_last_transfer,
-		s2mm_valid_s => s2mm_valid_s
+		s2mm_valid_s => s2mm_valid_s,
+		last_mm2s_transfer => last_mm2s_transfer,
+		mm2s_valid_s => mm2s_valid_s
 	);
 
 -- Instantiation of Axi Bus Interface M_AXI
@@ -202,7 +216,8 @@ DMA_DRAM_v1_0_M_AXI_inst : DMA_DRAM_v1_0_M_AXI
 		C_M_AXI_ADDR_WIDTH	=> C_M_AXI_ADDR_WIDTH,
 		C_M_AXI_DATA_WIDTH	=> C_M_AXI_DATA_WIDTH,
 		C_M_TRANSACTIONS_NUM	=> C_M_AXI_TRANSACTIONS_NUM,
-		Desired_DMA_Transfers => Desired_DMA_Transfers
+		Desired_DMA_Transfers => Desired_DMA_Transfers,
+		FIFO_depth          => FIFO_depth
 	)
 	port map (
 		--INIT_AXI_TXN	=> m_axi_init_axi_txn,
@@ -231,7 +246,10 @@ DMA_DRAM_v1_0_M_AXI_inst : DMA_DRAM_v1_0_M_AXI
 		M_AXI_RREADY	=> m_axi_rready,
 		start_trans   =>  start_trans,
 		last_transfer => last_transfer,
-		s2mm_v => s2mm_v
+		mm2s_v => mm2s_v,
+		s2mm_v => s2mm_v,
+		mm2s_last_transfer => mm2s_last_transfer,
+		frame_length => frame_length
 	);
 
 	-- Add user logic here
