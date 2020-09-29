@@ -40,7 +40,7 @@ entity fsm_dma_config is
     Base_DMA_addr : std_logic_vector := x"41e00000";
     Desired_DMA_Transfers : integer := 5;
     
-    FIFO_depth : integer := 5;
+    FIFO_depth : integer := 6;
     FIFO_width : integer := 32
     
     );
@@ -100,10 +100,10 @@ type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, mm2s_s
 signal dma_state : state_m;
 
 
---signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
+signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
 --signal MM2S_DMEM : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
 --signal DMEM_Addr : std_logic_vector(31 downto 0) := "01000000000000000000000000000000";
-signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
+--signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
 signal drcntr   : std_logic;
 signal dsignal : integer := 0;
 signal asignal  : std_logic := '0';
@@ -118,8 +118,8 @@ signal stopcore   : std_logic := '0';
 signal countrec  : integer := 0;
 signal start_reading : std_logic := '0';
 signal rsignal    : std_logic := '0';
-signal MM2S_DMEM  : std_logic_vector(31 downto 0) := (others => '0');
---signal MM2S_DMEM : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
+--signal MM2S_DMEM  : std_logic_vector(31 downto 0) := (others => '0');
+signal MM2S_DMEM : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
 signal Next_MM2S_Addr : integer := 0;
 signal loop_signal    : std_logic := '0';
 signal chck_signal   : std_logic := '0';
@@ -209,7 +209,7 @@ signal Write_DMEM_Addr : integer := 0;
 signal fb_shift_wr     : std_logic := '0';
 signal shift_offset    : integer := 0;
 signal add_shift_offset : integer := 0;
-signal neg_rd_ctr       : integer := 4;
+signal neg_rd_ctr       : integer := FIFO_depth-1;
 signal shift_counter   : integer := 0;
 signal count_neg   : integer := 0;
 signal shift_reverse  : std_logic := '0';
@@ -446,7 +446,7 @@ begin
                               Sec_base_MM2S_Addr <= 0;
                               end_buf_iter <= '1';
                               end_buf_s <= '1';
-                              neg_rd_ctr <= 4;
+                              neg_rd_ctr <= FIFO_depth-1;
                               end if;
                     
                     
@@ -536,7 +536,7 @@ begin
                    -- Below statement control the logic for addition of 4 more pixels from every row, counter number indicates the iteration, for next 4 pixels, counter number increments by one.
                    
                   if(mm2s_asignal = '1' and mm2s_other_rows = '1') then
-                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68) +16*counter_number,32));
+                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68) +8*counter_number,32));
                              mm2s_asignal <= '0';
                              mm2s_dsignal <= 0;
                              mm2s_scntr <= mm2s_scntr +1;
@@ -545,7 +545,7 @@ begin
                     -- This statement controls the addition of pixels when the last element of buffer has been reached. 
                              
                     elsif (mm2s_asignal = '1' and mm2s_shift_other_rows = '1') then
-                             MM2S_DMEM <= std_logic_vector(to_unsigned(shift_offset + (rd_ptr*68) +16*counter_number,32));   
+                             MM2S_DMEM <= std_logic_vector(to_unsigned(shift_offset + (rd_ptr*68) +8*counter_number,32));   
                                mm2s_asignal <= '0';
                                mm2s_dsignal <= 0;
                                mm2s_scntr <= mm2s_scntr +1;
@@ -596,9 +596,10 @@ begin
                                 -- 16 bytes
                                 
                                 -- should change to 4 pixels 16 bytes.
+                                -- changing to 2 pixels, 8 bytes
                                 
-                                dataw <= "00000000000000000000000000010000";
-                                mm2s_output_data <=   "00000000000000000000000000010000";
+                                dataw <= "00000000000000000000000000001000";
+                                mm2s_output_data <=   "00000000000000000000000000000100";
                              
                  
                              
@@ -639,7 +640,7 @@ begin
                                          dma_state <= dram_sa;
                                          cntrlread <= '0';
                                          loop_signal <= '1';
-                                          mm2s_base_offset <= mm2s_base_offset + 16;
+                                          mm2s_base_offset <= mm2s_base_offset + 8;
                                           mm2s_cycle_ctrl <= '1';
                                           cycle_turn_off <= '1';
                                           mm2s_base_ctrl <= '1';
@@ -654,8 +655,8 @@ begin
                                            end_buf_iter <= '0';
                                            end_buf_other_rows <= '1';
                                            if(cntrl_count_turnoff = '1') then
-                                           count_turnoff_neg <= 4;
-                                              if(end_buf_sig =6) then
+                                           count_turnoff_neg <= FIFO_depth-1;
+                                              if(end_buf_sig = FIFO_depth+1) then
                                             cntrl_count_turnoff <= '0';
                                              count_turnoff_neg <= 0;
                                            
@@ -669,7 +670,7 @@ begin
                                         -- 2nd row of 2nd image, 3rd row of 3rd image and so on has to be read. After all the rows are read in this manner, new image can be written at 0th location which is 
                                         -- controlled by "shift_image" signal.
                -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                           
-                                         if(counter_number = 4 and rd_ptr =4) then
+                                         if(counter_number = 8 and rd_ptr = FIFO_depth-1) then
                                          dma_state <= dram_addr;
                                          counter_number <= 0;
                                          shift_image <= '1';
@@ -723,8 +724,8 @@ begin
                                             mm2s_recon_proc_ctrl <= '0';
                                             add_shift_rise_offset <= 0;
                                                 if(neg_rd_ctr = 0) then
-                                                    neg_rd_ctr <= 4;
-                                                    count_turnoff_neg <= 4;
+                                                    neg_rd_ctr <= FIFO_depth-1;
+                                                    count_turnoff_neg <= FIFO_depth-1;
                                                     cntrl_count_turnoff <= '1';
                                                     end if;
                      -------------------------------------------------------------------------------------------------------------------------------------------------------                       
@@ -1148,12 +1149,12 @@ begin
             
                 counter_end_entry := counter_end_entry + 1;
                 counter_end_sec_entry := counter_end_sec_entry +1;
-                     if(counter_end_entry = 5) then
+                     if(counter_end_entry = FIFO_depth) then
                              shift_incrementer <= 0;
                              counter_end_entry := 0;
                              end if;
                              
-                      if(counter_end_sec_entry = 5) then
+                      if(counter_end_sec_entry = FIFO_depth) then
                             zero_sig_fb <= '1';
                             counter_end_sec_entry  := 0;
                         else
@@ -1180,12 +1181,12 @@ begin
             shift_incrementer_shift <= shift_incrementer_shift + 1024;
             shift_incrementer_zero := shift_incrementer_zero +1;
             end_buf_sig <= end_buf_sig + 1;
-              if(end_buf_sig = 6) then
+              if(end_buf_sig = FIFO_depth+1) then
                   end_buf_sig <= 0;
                 
        
                   end if;
-               if( shift_incrementer_zero = 5) then
+               if( shift_incrementer_zero = FIFO_depth) then
                      Sec_cntrl <= '1';
                       shift_incrementer_shift <= 0;
                        shift_incrementer_zero := 0;
