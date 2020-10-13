@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------
--- Company: 
+-- Company: Cosynth Gmbh 
 -- Engineer:  Muzamil Farid
 -- 
 -- Create Date: 14/09/2020 04:12:47 PM
@@ -17,8 +17,20 @@
 -- Additional Comments:
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
---   This design is responsible for development of ring buffer buffer data structure, The design is simulated with Block RAM and practically implemented on DRAM. The goal of this thesis is to 
---  develop different kinds of memory access patterns and then evaluate the speed and throughpout of every pattern thus trying to find the optimal memory access mechanisms.
+--   This design consists of a state machine implementing a ring buffer memory access pattern. FSM states are summarised below
+
+-- dma_s :  Starts the write channel of DMA core
+-- mm2s_start : Starts the Read channel of DMA core
+-- dram_addr  : The Address in memory where data has to be written
+-- dma_length : The amount of data needs to be written at specified memory location
+-- dma_read   : Checks the control register to check weather the core has stopped after write transfer.
+-- dma_status : Checks the status register weather the transfer has been completed or not,design alternates between dma_read and dma_status states as switching back to write states is not possible.
+-- dram_sa    : Configures the address to be read from the memory
+-- mm2s_length : Configures the amount of data need to be read from specified memory location
+-- mm2s_read   : Checks weather the transfer is successfull or not and with additional logic
+-- mm2s_status : To check weather the read is successfull or not, design alternates between mm2s_read and mm2s_status states as switching back to write states is not possible.
+-- mm2s_stop   : Stops the reading channel in case if reading process needs to be halted. It was used in benchmarking in the beginning    
+
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -38,10 +50,9 @@ entity fsm_dma_config is
  
  generic (
     Base_DMA_addr : std_logic_vector := x"41e00000";
-    Desired_DMA_Transfers : integer := 5;
     
-    FIFO_depth : integer := 6;
-    FIFO_width : integer := 32
+    FIFO_depth : integer := 6
+  
     
     );
  
@@ -53,25 +64,37 @@ entity fsm_dma_config is
  clk  : in std_logic;
  rst : in std_logic;
  
- -- Valid signal(single single for both master and slave for easier control scheme, Compliant with AXI )
- 
+
+ -- address write valid signal of write address channel of AXI
  valid_w : in std_logic;
  
- -- Ready Signal for handshake
  
+ -- address write ready signal of write address channel of AXI
  ready_w  : in std_logic;
  
- -- Address Read valid signal for reading data from Slave(AXI DMA) registers
  
+ -- Address Read valid signal of Read Address Channel of AXI
  valid_r  : in std_logic;
+ -- Address Read ready signal of Read Address channel of AXI 
  ready_r  : in std_logic;
+ -- Write valid and Write ready signals of Write data channel of AXI
+ wvalid : in std_logic;
+ wready : in std_logic;
+ -------------------------------------------------------------------------------------------------------------------------
+ --  signals of write response channel of AXI, Bvalid is asserted by slave when address and data has been successfully written, 
+ -- These two signals are used in state machine to switch between states in the design.
+ -------------------------------------------------------------------------------------------------------------------------- 
  Bvalid : in std_logic;
-
+ Bready : in std_logic;
+------------------------------------------------------------------------------------------------------------------------------
+-- Start write and Start read triggers the AXI write and Read transactions, start_write controls the address write valid and write valid signal.
+-- start_read controls the address read valid signal of Axi
+-------------------------------------------------------------------------------------------------------------------------------- 
  start_write : out std_logic;
  start_read  : out std_logic;
- start_write_d   : out std_logic;
  
  
+ -- start trans signal triggers the state machine
  start_trans : in std_logic;
  addrw  : out std_logic_vector(31 downto 0);
  dataw  : out std_logic_vector(31 downto 0);
@@ -82,9 +105,8 @@ entity fsm_dma_config is
  mm2s_last_transfer : out std_logic;
  mm2s_v     : out std_logic;
  s2mm_v : out std_logic;
- wvalid : in std_logic;
- wready : in std_logic;
- Bready : in std_logic;
+
+ -- Frame length of frame geenrated by AXI stream source used in write address calculation.
  frame_length : in std_logic_vector(31 downto 0)
 
  
@@ -99,11 +121,10 @@ type state_m is ( idle, dma_s, dram_addr, dma_length,dma_read,dma_status, mm2s_s
 
 signal dma_state : state_m;
 
+-- DMEM_Addr is the base address of memory.
+-- For DRAM, Base address is 0x00100000, For BRAM, this should be the same as in address editor in vivado
+signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
 
-signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
---signal MM2S_DMEM : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
---signal DMEM_Addr : std_logic_vector(31 downto 0) := "01000000000000000000000000000000";
---signal DMEM_Addr : std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
 signal drcntr   : std_logic;
 signal dsignal : integer := 0;
 signal asignal  : std_logic := '0';
@@ -118,8 +139,8 @@ signal stopcore   : std_logic := '0';
 signal countrec  : integer := 0;
 signal start_reading : std_logic := '0';
 signal rsignal    : std_logic := '0';
---signal MM2S_DMEM  : std_logic_vector(31 downto 0) := (others => '0');
-signal MM2S_DMEM : std_logic_vector(31 downto 0) := "00000000000100000000000000000000";
+-- MM2S_DMEM is the base address of memory for reading.
+signal MM2S_DMEM : std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
 signal Next_MM2S_Addr : integer := 0;
 signal loop_signal    : std_logic := '0';
 signal chck_signal   : std_logic := '0';
@@ -536,7 +557,7 @@ begin
                    -- Below statement control the logic for addition of 4 more pixels from every row, counter number indicates the iteration, for next 4 pixels, counter number increments by one.
                    
                   if(mm2s_asignal = '1' and mm2s_other_rows = '1') then
-                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68) +8*counter_number,32));
+                      MM2S_DMEM <= std_logic_vector(to_unsigned(mm2s_offset + (rd_ptr*68) +16*counter_number,32));
                              mm2s_asignal <= '0';
                              mm2s_dsignal <= 0;
                              mm2s_scntr <= mm2s_scntr +1;
@@ -545,7 +566,7 @@ begin
                     -- This statement controls the addition of pixels when the last element of buffer has been reached. 
                              
                     elsif (mm2s_asignal = '1' and mm2s_shift_other_rows = '1') then
-                             MM2S_DMEM <= std_logic_vector(to_unsigned(shift_offset + (rd_ptr*68) +8*counter_number,32));   
+                             MM2S_DMEM <= std_logic_vector(to_unsigned(shift_offset + (rd_ptr*68) +16*counter_number,32));   
                                mm2s_asignal <= '0';
                                mm2s_dsignal <= 0;
                                mm2s_scntr <= mm2s_scntr +1;
@@ -593,12 +614,9 @@ begin
                          cntrlread <= '0';
                          addrw <= std_logic_vector(to_unsigned(dma_mm2s_lngth_reg_addr, 32));
                           
-                                -- 16 bytes
+                                --Configured to 16 bytes as 4 pixels are read
                                 
-                                -- should change to 4 pixels 16 bytes.
-                                -- changing to 2 pixels, 8 bytes
-                                
-                                dataw <= "00000000000000000000000000001000";
+                                dataw <= "00000000000000000000000000010000";
                                 mm2s_output_data <=   "00000000000000000000000000000100";
                              
                  
@@ -640,7 +658,7 @@ begin
                                          dma_state <= dram_sa;
                                          cntrlread <= '0';
                                          loop_signal <= '1';
-                                          mm2s_base_offset <= mm2s_base_offset + 8;
+                                          mm2s_base_offset <= mm2s_base_offset + 16;
                                           mm2s_cycle_ctrl <= '1';
                                           cycle_turn_off <= '1';
                                           mm2s_base_ctrl <= '1';
@@ -669,8 +687,9 @@ begin
                                         -- For example, reading starts from 0th element of buffer to 4th element. According to desired memory access pattern, 1st full row of first image, 
                                         -- 2nd row of 2nd image, 3rd row of 3rd image and so on has to be read. After all the rows are read in this manner, new image can be written at 0th location which is 
                                         -- controlled by "shift_image" signal.
+                                        -- Counter_number performs iterations for every next 4 pixels reading.
                -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                           
-                                         if(counter_number = 8 and rd_ptr = FIFO_depth-1) then
+                                         if(counter_number = 4 and rd_ptr = FIFO_depth-1) then
                                          dma_state <= dram_addr;
                                          counter_number <= 0;
                                          shift_image <= '1';
@@ -887,7 +906,7 @@ begin
                countrec <= countrec + 1;
                rsignal <= '1';
         
-             if(countrec = Desired_DMA_Transfers-1) then
+             if(countrec = FIFO_depth-1) then
                stopcore <= '1';
                countrec <= 0;
                
@@ -1035,7 +1054,7 @@ begin
        
          end process;
    
-                 
+    -- This process was used prior to ring buffer implementation to calculate clock cycles for reading to calculate reading times, Its functionality is not employed in ring buffer implementation.             
   process(clk)
           begin
           if rising_edge(clk) then
@@ -1058,43 +1077,6 @@ begin
                  end if;
                    end process;
 
-  process(clk)
-     begin
-  
-         if rising_edge(clk) then
-            if(rst = '0') then
-             wr_ptr <= 0;
-            elsif(rsignal = '1') then
-            wr_ptr <= wr_ptr +1;
-            --FIFO_content(wr_ptr) <= Output_data;
-            
-            end if;
-            
-            if(wr_ptr = FIFO_depth-1 and rsignal = '1') then
-            wr_ptr_reg <= wr_ptr;
-            wr_ptr <= 0;
-            
-         --   if(shift_image <= '1') then
-         --    wr_ptr <= wr_ptr +1;
-         --   end if; 
-          
-          end if;
-          end if;
-        end process;
-            
-        
-                
-
-
-  process(wr_ptr, rd_ptr)
-    begin
-  
-     if (wr_ptr > rd_ptr) then
-          fifo_count <= wr_ptr-rd_ptr;
-      else
-            fifo_count <= (wr_ptr- rd_ptr) + FIFO_depth-1;
-            end if;    
-            end process;
       ---------------------------------------------------------------------------------------
        --This process controls the read pointer every time a successfull read has happened, 
        --The read pointer is frequently used in reading of pixels in above segments of design.
