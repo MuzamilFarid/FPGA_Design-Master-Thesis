@@ -21,3 +21,7 @@ only 4 pixels are read in every reading iteration.
 
 
 After all the rows are successfully read, the first element of buffer is over written and now the second element of buffer acts as first image and process repeats.
+
+
+
+Master_Thesis is the Pdf document describing this project in detail.
