@@ -25,3 +25,34 @@ After all the rows are successfully read, the first element of buffer is over wr
 
 
 Master_Thesis is the Pdf document describing this project in detail.
+
+
+
+
+DMA_DRAM_v1_0 is the top level file instantiating Master and Slave AXI interfaces.
+
+
+
+
+DMA_DRAM_v1_0_M_AXI contains the instantiation of state machine implementing memory access pattern
+
+
+
+
+
+DMA_DRAM_v1_0_S_AXI contains instantiation of thrghpt_dma
+
+
+
+thrghpt_dma contains the module which calculates the clock cycles to calculate writing and reading times and also to calculate the total time ring buffer will take
+
+
+
+
+
+Ssource_v1_0_M_AXIS is the module which generates images with generic frame length for simulation purposes.
+
+
+
+
+
